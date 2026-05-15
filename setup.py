@@ -1,0 +1,15 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="DL_BSA_F",
+    version="0.1.0",
+    packages=find_packages(),
+    install_requires=[
+        "torch",
+        "hydra-core",
+        "hydra-submitit-launcher",
+        "wandb",
+        "numpy",
+        # add your other dependencies
+    ],
+)
