@@ -10,6 +10,10 @@ def get_config():
             "results": "./outputs/results/",
             "plots": "./outputs/plots/"
         },
+        "raw_dataset": {
+            "num_patients" : 6877
+
+        },
 
         "dataset": {
             "name": "example",

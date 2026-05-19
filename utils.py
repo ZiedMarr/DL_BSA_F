@@ -87,3 +87,7 @@ def create_folders(config):
 def check_no_leakage(train_sids, test_sids):
     overlap = set(train_sids).intersection(set(test_sids))
     assert len(overlap) == 0, f"Data leakage detected: {overlap}"
+
+def save_file(dict):
+    #TODO: define a method that takes a dictionnary and saves it a s a file
+    pass
