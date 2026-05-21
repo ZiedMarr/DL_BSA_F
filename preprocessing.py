@@ -40,6 +40,7 @@ def unpack_signal(file_path):
     return signals, sig_len
 
 def form_subject_dict(signals_path, ref_path, subject_number):
+    #TODO : change signal shape (C,N) -> (N,C)
     """
     returns: 
         a directory that contains : subject_id, signals, labels
