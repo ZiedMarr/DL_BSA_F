@@ -72,22 +72,26 @@ def preprocess_data(config):
         subject_dict = form_subject_dict(signals_path=signals_path, ref_path=ref_path, subject_number=i)
         # preprocess the signals
         subject_dict["signals"] = preprocessing_pipeline(subject_dict["signals"])
-        #save file
-        save_subject_file(subject_dict)
+        # Segment signal
+        segmented_list = segmentation(subject_dict=subject_dict)
+        # Save to a file
+        save_subject_file(segmented_list)
 
 
 
 
 def save_subject_file(subject_dict):
-    #TODO: implement a method that saves the subject_dict as a file ( choose the right format)
+    #TODO: implement a method that a list of subject_dict as a file ( choose the right format)
     pass
+
 def preprocessing_pipeline(signal):
-    # butterworth filter
-    nk.signal_filter(signal, sampling_rate, lowcut=0.5, highcut=45, method='butterworth')
-    # Notch Filter : removing Powerline
-    nk.signal_filter(signal, sampling_rate, method='powerline', powerline=50)
     # removing Baseline Wander
     nk.signal_filter(signal, sampling_rate, method='savgol')
+    # Notch Filter : removing Powerline 
+    nk.signal_filter(signal, sampling_rate, method='powerline', powerline=50)
+    # butterworth filter
+    nk.signal_filter(signal, sampling_rate, lowcut=0.5, highcut=45, method='butterworth')
+    
 
 def preprocess_dataset(config):
     """
