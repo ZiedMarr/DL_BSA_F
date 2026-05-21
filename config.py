@@ -11,7 +11,7 @@ def get_config():
             "plots": "./outputs/plots/"
         },
         "raw_dataset": {
-            "num_patients" : 6877
+            "num_subjects" : 6877
 
         },
 
