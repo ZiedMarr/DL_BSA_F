@@ -24,10 +24,7 @@ def test_from_subject_dict():
     di = form_subject_dict(signals_path=signals_path, ref_path=ref_path, subject_number=43 )
     print(di)
 
-def test_unpack_signal() : 
-    file_path = "./data/Training_WFDB/A6851"
-    record = unpack_signal(file_path= file_path)
-    print(record)
+
 
 
 
