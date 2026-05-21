@@ -34,15 +34,21 @@ def test_unpack_signal() :
     print(record.shape)
 
 def visualize_signal(signal, channel, preprocess=False):
+    title = "raw"
     if preprocess:
         signal = preprocessing_pipeline(signal=signal)
-    t = np.arange(len(signal[:][channel])) / sampling_rate
-    plt.plot(t, signal[:][channel])
+        title = "preprocessed"
+    t = np.arange(len(signal[:,channel])) / sampling_rate
+    plt.figure()
+    plt.plot(t, signal[:, channel])
+    plt.title(title)
     plt.xlabel("Time (s)")
-    plt.show()
+    plt.show(block= False)
 
 if __name__ == "__main__":
     subj = form_subject_dict(signals_path, ref_path, 1222)
     visualize_signal(subj["signals"], 11, True)
     visualize_signal(subj["signals"], 11, False)
+    plt.pause(0.001)
+    input("Press Enter to close...")
 
