@@ -86,13 +86,18 @@ def save_subject_file(subject_dict):
 
 def preprocessing_pipeline(signal):
     #TODO : test
+    """
+    Applies Filters channel-wise
+    """
     # removing Baseline Wander
-    nk.signal_filter(signal, sampling_rate, method='savgol')
+    filtered = np.stack([nk.signal_filter(signal[:,c], sampling_rate, method='savgol') for c in range(signal.shape[1])], axis=1)
     # Notch Filter : removing Powerline 
-    nk.signal_filter(signal, sampling_rate, method='powerline', powerline=50)
+    filtered = np.stack([nk.signal_filter(filtered[:,c], sampling_rate, method='powerline', powerline=50) for c in range(signal.shape[1])], axis=1)
     # butterworth filter
-    nk.signal_filter(signal, sampling_rate, lowcut=0.5, highcut=45, method='butterworth')
-    
+    filtered = np.stack([nk.signal_filter(filtered[:,c], sampling_rate, lowcut=0.5, highcut=45, method='butterworth') for c in range(signal.shape[1])], axis=1)
+
+
+    return filtered
 
 def preprocess_dataset(config):
     """

@@ -1,7 +1,26 @@
-from preprocessing import segmentation, unpack_signal
+from preprocessing import segmentation, unpack_signal, preprocessing_pipeline, form_subject_dict
 import numpy as np
+import os
+from  matplotlib import pyplot as plt
+from config import get_config
+
+cfg = get_config()
+sampling_rate = cfg["dataset"]["sampling_rate"]
 
 
+def set_data_paths() :
+    #set paths
+    
+    raw_path = cfg["paths"]["raw_data"]
+    signals_path = os.path.join(raw_path, "Training_WFDB")
+    ref_path = os.path.join(raw_path, "REFERENCE.csv")
+
+    #set number of subjects
+    num_pat = cfg["raw_dataset"]["num_subjects"]
+
+    return signals_path, ref_path, num_pat
+
+signals_path, ref_path, num_pat = set_data_paths()
 
 def test_segmentation():
     signals = np.asarray([[1, 2],[3, 2],[5, 6], [3,5]])
@@ -14,5 +33,16 @@ def test_unpack_signal() :
     record, _  = unpack_signal(file_path= file_path)
     print(record.shape)
 
+def visualize_signal(signal, channel, preprocess=False):
+    if preprocess:
+        signal = preprocessing_pipeline(signal=signal)
+    t = np.arange(len(signal[:][channel])) / sampling_rate
+    plt.plot(t, signal[:][channel])
+    plt.xlabel("Time (s)")
+    plt.show()
+
 if __name__ == "__main__":
-    test_unpack_signal()
+    subj = form_subject_dict(signals_path, ref_path, 1222)
+    visualize_signal(subj["signals"], 11, True)
+    visualize_signal(subj["signals"], 11, False)
+
