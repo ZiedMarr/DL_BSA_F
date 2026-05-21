@@ -53,8 +53,13 @@ def evaluate(model, loader, device):
             y = batch["label"].to(device)
 
             outputs = model(x)
-            preds = torch.argmax(outputs, dim=1)
+            if y.ndim == 2:
+                preds = (torch.sigmoid(outputs) >= 0.5).float()
+                correct += (preds == y).all(dim=1).sum().item()
+                total += y.size(0)
+                continue
 
+            preds = torch.argmax(outputs, dim=1)
             correct += (preds == y).sum().item()
             total += y.size(0)
 
@@ -163,7 +168,10 @@ def run_experiment(config):
             lr=config["training"]["learning_rate"]
         )
 
-        criterion = nn.CrossEntropyLoss()
+        if config["preprocessing"].get("label_mode") == "snomed_multilabel":
+            criterion = nn.BCEWithLogitsLoss()
+        else:
+            criterion = nn.CrossEntropyLoss()
 
         # -------------------------
         # Training

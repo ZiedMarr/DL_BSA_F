@@ -51,7 +51,8 @@ class BiosignalDataset(Dataset):
         item = self.data[idx]
 
         x = torch.tensor(item["signal"], dtype=torch.float32)
-        y = torch.tensor(item["label"], dtype=torch.long)
+        label_dtype = torch.float32 if np.asarray(item["label"]).ndim > 0 else torch.long
+        y = torch.tensor(item["label"], dtype=label_dtype)
 
         return {
             "signal": x,   # (C, T)

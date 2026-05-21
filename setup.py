@@ -10,6 +10,10 @@ setup(
         "hydra-submitit-launcher",
         "wandb",
         "numpy",
+        "pandas",
+        "scipy",
+        "scikit-learn",
+        "wfdb",
         "kaggle",
         # add your other dependencies
     ],
