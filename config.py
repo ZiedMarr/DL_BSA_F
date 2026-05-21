@@ -11,7 +11,8 @@ def get_config():
             "plots": "./outputs/plots/"
         },
         "raw_dataset": {
-            "num_subjects" : 6877
+            "num_subjects" : 6877,
+            "sampling_rate" : 500
 
         },
 
@@ -20,6 +21,7 @@ def get_config():
             "input_channels": 1,
             "segment_length": 3000,
             "num_classes": 2,
+            "sampling_rate" : 500
         },
 
         "training": {
