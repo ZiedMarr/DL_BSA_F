@@ -4,6 +4,9 @@ import os
 import numpy as np
 import wfdb
 import pandas as pd
+from config import get_config
+
+cfg = get_config()
 
 
 def get_labels(csv_path, idx):
@@ -23,7 +26,7 @@ def unpack_signal(file_path):
     parameters: 
         file_path : path of the .hea file without .hea
     returns:
-        signals from the .mat file as an array of shape (C, N)
+        signals from the .mat file as an np array of shape (C, N)
     """
         
     # Load record 
@@ -146,3 +149,35 @@ def preprocess_dataset(config):
                 file_counter += 1
 
     print("Preprocessing complete.")
+
+
+def segmentation(subject_dict : dict):
+    """
+    segments the signals of a subject. Segment_size : to be found in config
+
+    parameteres:
+        subject_dict: gets a subject directory, with "signals" : (N, C)
+    returns: 
+        dicts_list: a list containing dictionnaries with "signals": segment of the original signal (N, C)
+    
+    """
+    dicts_list = []
+    
+    signals = subject_dict["signals"]
+    #define number of number of segments
+    segment_size = cfg["dataset"]["segment_length"]
+    n_segments = signals.shape[0] // segment_size
+    #split signal array into equally sized 
+    segments_list = [signals[ i*segment_size:(i+1)*segment_size, : ] for i in range(n_segments) ] 
+
+    for segment in segments_list:
+        data_point = {"subject_id" :  subject_dict["subject_id"] , "signals" : segment , "labels" : subject_dict["labels"]}
+        dicts_list.append(data_point)
+    
+    return dicts_list
+
+
+
+
+
+
