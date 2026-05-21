@@ -34,7 +34,8 @@ def unpack_signal(file_path):
     # Metadata from the .hea file
     sig_len = record.sig_len  # number of samples
 
-    return signals
+    return signals, sig_len
+
 def form_subject_dict(signals_path, ref_path, subject_number):
     """
     returns: 
@@ -45,7 +46,7 @@ def form_subject_dict(signals_path, ref_path, subject_number):
     #set signal file path
     sig_file_path = os.path.join(signals_path, subject_id)
     #get signals
-    signals = unpack_signal(sig_file_path)
+    signals, _ = unpack_signal(sig_file_path)
     #get labels
     labels = get_labels(ref_path, subject_number)
     # form subject dict:
