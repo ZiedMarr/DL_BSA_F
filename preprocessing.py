@@ -4,9 +4,11 @@ import os
 import numpy as np
 import wfdb
 import pandas as pd
+import neurokit2 as nk
 from config import get_config
 
 cfg = get_config()
+sampling_rate = cfg["dataset"]["sampling_rate"]
 
 
 def get_labels(csv_path, idx):
@@ -74,13 +76,18 @@ def preprocess_data(config):
         save_subject_file(subject_dict)
 
 
+
+
 def save_subject_file(subject_dict):
     #TODO: implement a method that saves the subject_dict as a file ( choose the right format)
     pass
-def preprocessing_pipeline(signals):
-    #TODO: implement preprocessing pipeline
-    pass
-
+def preprocessing_pipeline(signal):
+    # butterworth filter
+    nk.signal_filter(signal, sampling_rate, lowcut=0.5, highcut=45, method='butterworth')
+    # Notch Filter : removing Powerline
+    nk.signal_filter(signal, sampling_rate, method='powerline', powerline=50)
+    # removing Baseline Wander
+    nk.signal_filter(signal, sampling_rate, method='savgol')
 
 def preprocess_dataset(config):
     """
