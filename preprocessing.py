@@ -6,6 +6,9 @@ import wfdb
 import pandas as pd
 import neurokit2 as nk
 from config import get_config
+from math import gcd
+from scipy.signal import resample_poly
+
 
 cfg = get_config()
 sampling_rate = cfg["dataset"]["sampling_rate"]
@@ -84,20 +87,60 @@ def save_subject_file(subject_dict):
     #TODO: implement a method that a list of subject_dict as a file ( choose the right format)
     pass
 
+def _baseline_wander_remove(signal ):
+     # removing Baseline Wander
+    filtered = np.stack([nk.signal_filter(signal[:,c], sampling_rate, method='savgol') for c in range(signal.shape[1])], axis=1)
+    return filtered
+
+def _notch(signal ):
+    powerline = cfg["preprocess"]["powerline"]
+     # Notch Filter : removing Powerline 
+    filtered = np.stack([nk.signal_filter(signal[:,c], sampling_rate, method='powerline', powerline=powerline) for c in range(signal.shape[1])], axis=1)
+    return filtered
+
+def _butterworth(signal):
+    lowcut = cfg["preprocess"]["lowcut"]
+    highcut = cfg["preprocess"]["highcut"]
+    # butterworth filter
+    filtered = np.stack([nk.signal_filter(signal[:,c], sampling_rate, lowcut=lowcut, highcut=highcut, method='butterworth') for c in range(signal.shape[1])], axis=1)
+    return filtered
+
+def _z_score_norm(signal):
+    #each lead normalized independently
+    for ch in range(signal.shape[1]):
+        signal[:, ch] = (signal[:, ch] - signal[:, ch].mean()) / signal[:, ch].std()
+
+    return signal
+
+def _downsample(signal):
+    #get the fs rates
+    original_fs = cfg["dataset"]["sampling_rate"]
+    target_fs = cfg["preprocess"]["downsampeled_rate"]
+    # greatest common denominator
+    g = gcd(original_fs, target_fs)
+    # get the downsampling coefficients
+    up = target_fs // g
+    down = original_fs // g
+    return resample_poly(signal, up, down, axis=0)
+
 def preprocessing_pipeline(signal):
     #TODO : test
     """
     Applies Filters channel-wise
     """
     # removing Baseline Wander
-    filtered = np.stack([nk.signal_filter(signal[:,c], sampling_rate, method='savgol') for c in range(signal.shape[1])], axis=1)
+    filtered = _baseline_wander_remove(signal)
     # Notch Filter : removing Powerline 
-    filtered = np.stack([nk.signal_filter(filtered[:,c], sampling_rate, method='powerline', powerline=50) for c in range(signal.shape[1])], axis=1)
+    filtered = _notch(filtered)
     # butterworth filter
-    filtered = np.stack([nk.signal_filter(filtered[:,c], sampling_rate, lowcut=0.5, highcut=45, method='butterworth') for c in range(signal.shape[1])], axis=1)
+    filtered = _butterworth(filtered)
+    #downsample signal
+    down_sampeled = _downsample(filtered)
+    #z_score_norm
+    normalized = _z_score_norm(down_sampeled)
+    
 
-
-    return filtered
+    return normalized
 
 def preprocess_dataset(config):
     """

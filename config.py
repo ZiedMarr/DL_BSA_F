@@ -24,6 +24,13 @@ def get_config():
             "sampling_rate" : 500
         },
 
+        "preprocess": {
+            "powerline" : 50,
+            "highcut" :45 ,
+            "lowcut" : 0.5,
+            "downsampeled_rate" : 250
+        },
+
         "training": {
             "batch_size": 32,
             "epochs": 20,
