@@ -63,6 +63,7 @@ def preprocess_dataset(config):
     print(f"Subjects skipped: {subjects_skipped}")
     print(f"Total segments saved: {total_segments}")
     validate_processed_files(save_path, config)
+    print_processed_label_statistics(save_path, config)
 
 
 def form_subject_dict(signals_path, reference_df=None, subject_number=None, config=None, ref_path=None):
@@ -296,3 +297,25 @@ def validate_processed_files(save_path, config):
     print("Processed output validation completed")
     print(f"Valid processed files: {valid_files}")
     print(f"Invalid processed files: {invalid_files}")
+
+
+def print_processed_label_statistics(save_path, config):
+    num_classes = config["dataset"]["num_classes"]
+    label_segment_counts = np.zeros(num_classes, dtype=int)
+    total_segments = 0
+
+    for file in os.listdir(save_path):
+        if not file.endswith(".npy"):
+            continue
+
+        file_path = os.path.join(save_path, file)
+        sample = np.load(file_path, allow_pickle=True).item()
+        labels = sample["labels"]
+
+        total_segments += labels.shape[0]
+        label_segment_counts += labels.sum(axis=0).astype(int)
+
+    print("Processed label statistics")
+    print(f"Total segments: {total_segments}")
+    for label_idx, segment_count in enumerate(label_segment_counts, start=1):
+        print(f"Label {label_idx}: {segment_count} segments")
