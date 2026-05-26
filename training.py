@@ -53,9 +53,9 @@ def evaluate(model, loader, device):
             y = batch["label"].to(device)
 
             outputs = model(x)
-            preds = torch.argmax(outputs, dim=1)
+            preds = (torch.sigmoid(outputs) >= 0.5).float()
 
-            correct += (preds == y).sum().item()
+            correct += (preds == y).all(dim=1).sum().item()
             total += y.size(0)
 
     return correct / total
@@ -163,7 +163,7 @@ def run_experiment(config):
             lr=config["training"]["learning_rate"]
         )
 
-        criterion = nn.CrossEntropyLoss()
+        criterion = nn.BCEWithLogitsLoss()
 
         # -------------------------
         # Training

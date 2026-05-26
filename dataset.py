@@ -51,7 +51,7 @@ class BiosignalDataset(Dataset):
         item = self.data[idx]
 
         x = torch.tensor(item["signal"], dtype=torch.float32)
-        y = torch.tensor(item["label"], dtype=torch.long)
+        y = torch.tensor(item["label"], dtype=torch.float32)
 
         return {
             "signal": x,   # (C, T)

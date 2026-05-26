@@ -18,9 +18,9 @@ def get_config():
 
         "dataset": {
             "name": "example",
-            "input_channels": 1,
-            "segment_length": 3000,
-            "num_classes": 2,
+            "input_channels": 12,
+            "segment_length": 1500,
+            "num_classes": 9,
             "sampling_rate" : 500
         },
 
@@ -28,7 +28,8 @@ def get_config():
             "powerline" : 50,
             "highcut" :45 ,
             "lowcut" : 0.5,
-            "downsampeled_rate" : 250
+            "downsampled_rate" : 250,
+            "overlap_ratio" : 0.5
         },
 
         "training": {
