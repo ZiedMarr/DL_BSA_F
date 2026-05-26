@@ -145,7 +145,7 @@ def preprocessing_pipeline(signal, config=None):
     # bandpass butterworth filter
     filtered = _butterworth(filtered)
     #downsample signal
-    down_sampeled = _downsample(filtered, config=config)
+    down_sampeled = _downsample(filtered)
     #z_score_norm
     normalized = _z_score_norm(down_sampeled)
     
@@ -174,12 +174,10 @@ def _butterworth(signal):
     return filtered
 
 
-def _downsample(signal, config=None):
-    if config is None:
-        config = cfg
+def _downsample(signal):
     #get the fs rates
-    original_fs = config["dataset"]["sampling_rate"]
-    target_fs = config["preprocess"]["downsampled_rate"]
+    original_fs = cfg["dataset"]["sampling_rate"]
+    target_fs = cfg["preprocess"]["downsampled_rate"]
     # greatest common denominator
     g = gcd(original_fs, target_fs)
     # get the downsampling coefficients
