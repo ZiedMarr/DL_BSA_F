@@ -26,8 +26,8 @@ def get_config():
 
         "preprocess": {
             "powerline" : 50,
-            "highcut" :45 ,
             "lowcut" : 0.5,
+            "highcut" :45 ,
             "downsampled_rate" : 250,
             "overlap_ratio" : 0.5
         },

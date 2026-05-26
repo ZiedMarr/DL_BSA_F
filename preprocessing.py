@@ -140,11 +140,9 @@ def preprocessing_pipeline(signal, config=None):
     """
     if config is None:
         config = cfg
-    # removing Baseline Wander
-    filtered = _baseline_wander_remove(signal, config=config)
     # Notch Filter : removing Powerline 
-    filtered = _notch(filtered, config=config)
-    # butterworth filter
+    filtered = _notch(signal, config=config)
+    # bandpass butterworth filter
     filtered = _butterworth(filtered, config=config)
     #downsample signal
     down_sampeled = _downsample(filtered, config=config)
@@ -180,7 +178,7 @@ def _butterworth(signal, config=None):
     sampling_rate = config["dataset"]["sampling_rate"]
     lowcut = config["preprocess"]["lowcut"]
     highcut = config["preprocess"]["highcut"]
-    # butterworth filter
+    # bandpass butterworth filter
     filtered = np.stack([nk.signal_filter(signal[:,c], sampling_rate, lowcut=lowcut, highcut=highcut, method='butterworth') for c in range(signal.shape[1])], axis=1)
     return filtered
 
@@ -233,6 +231,10 @@ def segmentation(subject_dict : dict, segment_size=None, overlap_ratio=None):
     step_size = int(segment_size * (1 - overlap_ratio))
     if step_size <= 0:
         raise ValueError("overlap_ratio must be less than 1.")
+
+    if signals.shape[0] < segment_size:
+        pad_length = segment_size - signals.shape[0]
+        signals = np.pad(signals, ((0, pad_length), (0, 0)), mode="constant")
 
     #split signal array into overlapping segments
     segments_list = [signals[start:start+segment_size, : ] for start in range(0, signals.shape[0] - segment_size + 1, step_size) ] 
