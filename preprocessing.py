@@ -141,9 +141,9 @@ def preprocessing_pipeline(signal, config=None):
     if config is None:
         config = cfg
     # Notch Filter : removing Powerline 
-    filtered = _notch(signal, config=config)
+    filtered = _notch(signal)
     # bandpass butterworth filter
-    filtered = _butterworth(filtered, config=config)
+    filtered = _butterworth(filtered)
     #downsample signal
     down_sampeled = _downsample(filtered, config=config)
     #z_score_norm
@@ -153,31 +153,22 @@ def preprocessing_pipeline(signal, config=None):
     return normalized
 
 
-def _baseline_wander_remove(signal, config=None):
+def _baseline_wander_remove(signal):
      # removing Baseline Wander
-    if config is None:
-        config = cfg
-    sampling_rate = config["dataset"]["sampling_rate"]
     filtered = np.stack([nk.signal_filter(signal[:,c], sampling_rate, method='savgol') for c in range(signal.shape[1])], axis=1)
     return filtered
 
 
-def _notch(signal, config=None):
-    if config is None:
-        config = cfg
-    sampling_rate = config["dataset"]["sampling_rate"]
-    powerline = config["preprocess"]["powerline"]
+def _notch(signal):
+    powerline = cfg["preprocess"]["powerline"]
      # Notch Filter : removing Powerline 
     filtered = np.stack([nk.signal_filter(signal[:,c], sampling_rate, method='powerline', powerline=powerline) for c in range(signal.shape[1])], axis=1)
     return filtered
 
 
-def _butterworth(signal, config=None):
-    if config is None:
-        config = cfg
-    sampling_rate = config["dataset"]["sampling_rate"]
-    lowcut = config["preprocess"]["lowcut"]
-    highcut = config["preprocess"]["highcut"]
+def _butterworth(signal):
+    lowcut = cfg["preprocess"]["lowcut"]
+    highcut = cfg["preprocess"]["highcut"]
     # bandpass butterworth filter
     filtered = np.stack([nk.signal_filter(signal[:,c], sampling_rate, lowcut=lowcut, highcut=highcut, method='butterworth') for c in range(signal.shape[1])], axis=1)
     return filtered
