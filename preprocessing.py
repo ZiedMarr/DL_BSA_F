@@ -62,14 +62,14 @@ def form_subject_dict(signals_path, ref_path, subject_number):
         
     return subject_dict
 
-def preprocess_data(config):
+def preprocess_data():
     #set paths
-    raw_path = config["paths"]["raw_data"]
+    raw_path = cfg["paths"]["raw_data"]
     signals_path = os.path.join(raw_path, "Training_WFDB")
     ref_path = os.path.join(raw_path, "REFERENCE.csv")
 
     #set number of subjects
-    num_pat = config["raw_dataset"]["num_subjects"]
+    num_pat = cfg["raw_dataset"]["num_subjects"]
 
     for i in range(1, num_pat +1):
         subject_dict = form_subject_dict(signals_path=signals_path, ref_path=ref_path, subject_number=i)
@@ -78,14 +78,20 @@ def preprocess_data(config):
         # Segment signal
         segmented_list = segmentation(subject_dict=subject_dict)
         # Save to a file
-        save_subject_file(segmented_list)
+        for segmented_dict in segmented_list:
+            save_subject_file(segmented_dict)
 
 
 
 
 def save_subject_file(subject_dict):
     #TODO: implement a method that a list of subject_dict as a file ( choose the right format)
-    pass
+    save_path = cfg["paths"]["processed_data"]
+    os.makedirs(save_path, exist_ok=True)
+    subject_id = subject_dict["subject_id"]
+    file_path = os.path.join(save_path, f"{subject_id}.npy")
+
+    np.save(file_path, subject_dict)
 
 def _baseline_wander_remove(signal ):
      # removing Baseline Wander
@@ -107,6 +113,7 @@ def _butterworth(signal):
 
 def _z_score_norm(signal):
     #each lead normalized independently
+    #TODO: avoid / 0 division
     for ch in range(signal.shape[1]):
         signal[:, ch] = (signal[:, ch] - signal[:, ch].mean()) / signal[:, ch].std()
 
@@ -135,9 +142,9 @@ def preprocessing_pipeline(signal):
     # butterworth filter
     filtered = _butterworth(filtered)
     #downsample signal
-    down_sampeled = _downsample(filtered)
+    #down_sampeled = _downsample(filtered)
     #z_score_norm
-    normalized = _z_score_norm(down_sampeled)
+    normalized = _z_score_norm(filtered)
     
 
     return normalized
@@ -237,7 +244,8 @@ def segmentation(subject_dict : dict):
     
     return dicts_list
 
-
+if __name__ == "__main__":
+    preprocess_data()
 
 
 
