@@ -5,9 +5,11 @@ import json
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Subset
+import wandb
+
 
 from dataset import BiosignalDataset
-from models import Model
+from model import Model
 from utils import (
     get_subject_ids,
     loso_split,
@@ -72,6 +74,14 @@ def save_results(results, config):
 # -------------------------
 
 def run_experiment(config):
+
+    # Initialize wandb
+    wandb.init(
+    project=config.PROJECT_NAME,
+    name=config.EXPERIMENT_NAME,
+    config=vars(config)
+)
+
     device = config["training"]["device"]
     protocol = config["evaluation"]["protocol"]
 
@@ -175,6 +185,12 @@ def run_experiment(config):
 
             print(f"Epoch {epoch+1}: Loss={loss:.4f}, Acc={acc:.4f}")
 
+            # Log results to wandB
+            wandb.log({
+            "train_loss": loss,
+            "accuracy": acc
+            })
+
         # -------------------------
         # Save checkpoint
         # -------------------------
@@ -184,6 +200,9 @@ def run_experiment(config):
             os.path.join(config["paths"]["checkpoints"], f"model_fold{fold}.pt")
         )
 
+        # finish wandB 
+        wandb.finish()
+        
         results.append(acc)
 
     print("\nFinal Results:", results)
