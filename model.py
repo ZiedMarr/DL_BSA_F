@@ -14,6 +14,7 @@ class Model(nn.Module):
 
     Input shape:  (B, C, T)
     Output shape: (B, num_classes) for classification
+        for each class -> a float -> if > threshhold -> assign label 
     """
 
     def __init__(self, config):
