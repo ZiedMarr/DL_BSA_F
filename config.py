@@ -2,6 +2,10 @@
 
 def get_config():
     config = {
+        "wandb": {
+            "EXPERIMENT_NAME": "baseline_1" ,
+            "PROJECT_NAME": "ecg-classification"
+        },
         "paths": {
             "raw_data": "./data/raw/",
             "processed_data": "./data/processed/",
