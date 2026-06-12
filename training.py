@@ -162,7 +162,7 @@ def run_experiment(config):
             model.parameters(),
             lr=config["training"]["learning_rate"]
         )
-
+        #TODO : choose the right Loss
         criterion = nn.BCEWithLogitsLoss()
 
         # -------------------------
