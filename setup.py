@@ -10,7 +10,8 @@ setup(
         "hydra-submitit-launcher",
         "wandb",
         "numpy",
-        "kaggle",
+        "kaggle"
+        ,"wandb"
         # add your other dependencies
     ],
 )
