@@ -100,6 +100,8 @@ The second model is:
 resnet
 ```
 
+This uses residual blocks instead of the recurrent layer.
+
 
 The model output is raw logits. Sigmoid is applied later during evaluation, because the loss function is `BCEWithLogitsLoss`.
 
