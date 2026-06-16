@@ -92,7 +92,7 @@ The default model is:
 cnn1d
 ```
 
-This is a 1D CNN followed by a BiGRU and attention layer. The CNN part learns local ECG patterns, the BiGRU models the sequence, and attention gives more weight to useful time steps.
+This is a 1D CNN followed by a BiGRU and attention layer.
 
 The second model is:
 
@@ -100,7 +100,6 @@ The second model is:
 resnet
 ```
 
-This uses residual blocks instead of the recurrent layer. It is useful as a different comparison model.
 
 The model output is raw logits. Sigmoid is applied later during evaluation, because the loss function is `BCEWithLogitsLoss`.
 
