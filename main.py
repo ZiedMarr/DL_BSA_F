@@ -16,6 +16,11 @@ def parse_args():
         choices=["cnn1d", "resnet"],
         help="Model to train. If not set, config.py is used.",
     )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        help="Number of training epochs. If not set, config.py is used.",
+    )
     return parser.parse_args()
 
 
@@ -34,6 +39,9 @@ def main():
 
     if args.model is not None:
         config["model"]["name"] = args.model
+
+    if args.epochs is not None:
+        config["training"]["epochs"] = args.epochs
 
     create_folders(config)
 

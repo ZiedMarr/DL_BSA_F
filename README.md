@@ -139,6 +139,19 @@ python main.py --model cnn1d
 python main.py --model resnet
 ```
 
+Change the number of epochs from the command line:
+
+```bash
+python main.py --model cnn1d --epochs 100
+python main.py --model resnet --epochs 100
+```
+
+For a quick test before submitting a cluster job:
+
+```bash
+python main.py --model cnn1d --epochs 1
+```
+
 If processed `.npy` files already exist, preprocessing is skipped and training starts directly.
 
 ## Outputs
