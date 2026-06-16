@@ -11,7 +11,7 @@ from sklearn.metrics import f1_score, roc_auc_score
 from torch.utils.data import DataLoader, Subset
 
 from dataset import BiosignalDataset
-from model import Model
+from models import get_model
 from utils import (
     check_no_leakage,
     get_subject_ids,
@@ -90,8 +90,9 @@ def evaluate(model, loader, device):
 
 def save_results(results, config):
     results_path = config["paths"]["results"]
-    json_path = os.path.join(results_path, "results.json")
-    csv_path = os.path.join(results_path, "summary.csv")
+    model_name = config["model"]["name"]
+    json_path = os.path.join(results_path, f"{model_name}_results.json")
+    csv_path = os.path.join(results_path, f"{model_name}_summary.csv")
 
     with open(json_path, "w") as f:
         json.dump({"results": results}, f, indent=4)
@@ -169,7 +170,7 @@ def run_experiment(config):
             shuffle=False,
         )
 
-        model = Model(config).to(device)
+        model = get_model(config).to(device)
         dummy = torch.randn(
             2,
             config["dataset"]["input_channels"],
@@ -210,7 +211,10 @@ def run_experiment(config):
 
         torch.save(
             model.state_dict(),
-            os.path.join(config["paths"]["checkpoints"], f"model_fold{fold}.pt"),
+            os.path.join(
+                config["paths"]["checkpoints"],
+                f"{config['model']['name']}_fold{fold}.pt",
+            ),
         )
 
         results.append(

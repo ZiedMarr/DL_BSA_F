@@ -24,6 +24,10 @@ def get_config():
             "sampling_rate" : 500
         },
 
+        "model": {
+            "name": "cnn1d"
+        },
+
         "preprocess": {
             "powerline" : 50,
             "lowcut" : 0.5,

@@ -1,34 +1,31 @@
-# DL-BSA ECG Classification Project
+# DL-BSA ECG Classification
 
-This project trains a deep learning model for multi-label ECG classification using the China Physiological Signal Challenge 2018 dataset.
+This is our code for the DL-BSA ECG classification project. The dataset used is the China Physiological Signal Challenge 2018 dataset.
 
-The pipeline is:
+The main idea is simple:
 
 ```text
-raw WFDB ECG files
--> preprocessing
--> processed .npy files
--> PyTorch dataset
--> CNN + BiGRU + Attention model
--> 10-fold group cross-validation
+raw ECG files -> preprocessing -> .npy files -> dataset -> model training
 ```
 
-## Data Layout
+The task is multi-label classification, so one ECG recording can have more than one label.
 
-The raw data should be placed here:
+## Data
+
+Put the raw data in this structure:
 
 ```text
 data/raw/Training_WFDB/
 data/raw/REFERENCE.csv
 ```
 
-The preprocessing step creates processed files here:
+After preprocessing, the processed files are saved in:
 
 ```text
 data/processed/
 ```
 
-Each processed subject file is saved as:
+Each saved file looks like this:
 
 ```python
 {
@@ -38,101 +35,131 @@ Each processed subject file is saved as:
 }
 ```
 
-The 1500 samples correspond to 6 seconds after downsampling to 250 Hz.
+The signal length is 1500 samples because the ECG is downsampled to 250 Hz and each segment is 6 seconds long.
 
-## Files
+## What Each File Does
 
 `config.py`
 
-Stores the main settings, including paths, sampling rate, segment length, batch size, number of epochs, and evaluation protocol.
+Contains the main settings such as paths, segment length, model name, batch size, epochs, and number of folds.
 
 `preprocessing.py`
 
-Loads the raw ECG signals, reads the labels, applies filtering, downsamples the signals, normalizes them, splits them into 6-second segments, and saves the processed `.npy` files.
+Loads the WFDB ECG files, reads the labels, filters the signals, downsamples them, normalizes them, splits them into 6-second segments, and saves `.npy` files.
 
 `dataset.py`
 
-Loads the processed `.npy` files and returns PyTorch samples containing `signal`, `label`, and `subject_id`.
+Loads the processed `.npy` files and returns samples for PyTorch.
 
-`model.py`
+`models.py`
 
-Defines the CNN + BiGRU + Attention model. The model takes input with shape `(batch_size, 12, 1500)` and outputs 9 logits.
+Contains the two models:
+
+```text
+cnn1d  = 1D CNN + BiGRU + Attention
+resnet = 1D ResNet
+```
+
+Both models take input with shape:
+
+```python
+(batch_size, 12, 1500)
+```
+
+and output:
+
+```python
+(batch_size, 9)
+```
 
 `training.py`
 
-Handles the training loop, loss function, evaluation metrics, 10-fold group splitting, checkpoint saving, and result saving.
+Trains the selected model, evaluates it, saves model weights, and saves the results.
 
 `utils.py`
 
-Contains helper functions for creating folders, getting subject IDs, making evaluation splits, and checking for subject leakage.
+Contains helper functions for creating folders, getting subject IDs, and making train/test splits.
 
 `main.py`
 
-Runs the full pipeline. It creates folders, runs preprocessing if processed files are missing, then starts training.
+Runs the whole pipeline.
 
-## Model
+## Models
 
-The model uses:
-
-```text
-5 x 1D convolution layers
-Batch normalization
-ReLU
-Max pooling
-Bidirectional GRU
-Attention
-Dropout
-Fully connected output layer
-```
-
-The model returns raw logits. Sigmoid is applied during evaluation, not inside the model.
-
-## Training Setup
-
-Current settings:
+The default model is:
 
 ```text
-Loss: BCEWithLogitsLoss
-Evaluation protocol: 10-fold Group K-Fold
-Epochs: 100
-Batch size: 32
-Metrics: macro F1, micro F1, macro ROC-AUC, per-class F1
+cnn1d
 ```
 
-Group K-Fold is used so that all segments from the same ECG recording stay in the same fold.
+This is a 1D CNN followed by a BiGRU and attention layer. The CNN part learns local ECG patterns, the BiGRU models the sequence, and attention gives more weight to useful time steps.
+
+The second model is:
+
+```text
+resnet
+```
+
+This uses residual blocks instead of the recurrent layer. It is useful as a different comparison model.
+
+The model output is raw logits. Sigmoid is applied later during evaluation, because the loss function is `BCEWithLogitsLoss`.
+
+## Training
+
+Current training setup:
+
+```text
+epochs: 100
+batch size: 32
+loss: BCEWithLogitsLoss
+evaluation: 10-fold Group K-Fold
+metrics: macro F1, micro F1, macro AUC, per-class F1
+```
+
+Group K-Fold is used because each ECG recording is split into several segments. Segments from the same ECG should not appear in both training and testing.
 
 ## How To Run
 
-Install dependencies:
+Install the required packages:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Run the full pipeline:
+Run the default model:
 
 ```bash
 python main.py
 ```
 
-On the first run, preprocessing creates the `.npy` files. On later runs, if processed files already exist, preprocessing is skipped and training starts directly.
+Choose a model manually:
+
+```bash
+python main.py --model cnn1d
+python main.py --model resnet
+```
+
+If processed `.npy` files already exist, preprocessing is skipped and training starts directly.
 
 ## Outputs
 
-Training outputs are saved in:
+Trained model weights are saved in:
 
 ```text
 outputs/models/
+```
+
+Results are saved in:
+
+```text
 outputs/results/
 ```
 
-The results folder contains:
+For example, when training `cnn1d`, the result files are:
 
 ```text
-results.json
-summary.csv
+cnn1d_results.json
+cnn1d_summary.csv
 ```
 
-`results.json` stores the detailed fold and epoch history.
-
-`summary.csv` stores the final metrics for each fold and can be opened in Excel.
+The JSON file keeps the full fold and epoch history. The CSV file is a simpler summary that can be opened in Excel.
