@@ -4,7 +4,6 @@ import argparse
 import os
 
 from config import get_config
-from preprocessing import preprocess_dataset
 from training import run_experiment
 from utils import create_folders
 
@@ -46,6 +45,8 @@ def main():
     create_folders(config)
 
     if not processed_data_exists(config):
+        from preprocessing import preprocess_dataset
+
         preprocess_dataset(config)
 
     run_experiment(config)
