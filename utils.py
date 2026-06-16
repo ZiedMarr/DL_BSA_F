@@ -5,10 +5,6 @@ import numpy as np
 from sklearn.model_selection import KFold
 
 
-# -------------------------
-# Subject utilities
-# -------------------------
-
 def get_subject_ids(data_path):
     subject_ids = set()
 
@@ -25,14 +21,7 @@ def get_subject_ids(data_path):
     return sorted(list(subject_ids))
 
 
-# -------------------------
-# Splitting strategies
-# -------------------------
-
 def loso_split(subject_ids):
-    """
-    Leave-One-Subject-Out
-    """
     splits = []
 
     for test_sid in subject_ids:
@@ -43,10 +32,6 @@ def loso_split(subject_ids):
 
 
 def lmso_split(subject_ids, k=5):
-    """
-    Leave-Multiple-Subjects-Out
-    """
-
     kf = KFold(n_splits=k, shuffle=True, random_state=42)
     splits = []
 
@@ -59,11 +44,20 @@ def lmso_split(subject_ids, k=5):
     return splits
 
 
+def group_kfold_split(subject_ids, k=10):
+    # Keep all segments from the same recording in the same fold.
+    kf = KFold(n_splits=k, shuffle=True, random_state=42)
+    splits = []
+
+    for train_idx, test_idx in kf.split(subject_ids):
+        train_sids = [subject_ids[i] for i in train_idx]
+        test_sids = [subject_ids[i] for i in test_idx]
+        splits.append((train_sids, test_sids))
+
+    return splits
+
+
 def kfold_split_indices(n_samples, k=5):
-    """
-    Conventional K-Fold (sample-level)
-    WARNING: may cause subject leakage
-    """
     kf = KFold(n_splits=k, shuffle=True, random_state=42)
 
     splits = []
@@ -75,10 +69,6 @@ def kfold_split_indices(n_samples, k=5):
     return splits
 
 
-# -------------------------
-# Misc
-# -------------------------
-
 def create_folders(config):
     for path in config["paths"].values():
         os.makedirs(path, exist_ok=True)
@@ -88,6 +78,6 @@ def check_no_leakage(train_sids, test_sids):
     overlap = set(train_sids).intersection(set(test_sids))
     assert len(overlap) == 0, f"Data leakage detected: {overlap}"
 
+
 def save_file(dict):
-    #TODO: define a method that takes a dictionnary and saves it a s a file
     pass

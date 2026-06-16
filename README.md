@@ -1,112 +1,138 @@
-# DL-BSA Project – Starter Template
+# DL-BSA ECG Classification Project
 
-This repository provides a **minimal starting point** for the Deep Learning for Biosignal Analysis (DL-BSA) project. It is intentionally simple and is meant to be **modified and extended**.
+This project trains a deep learning model for multi-label ECG classification using the China Physiological Signal Challenge 2018 dataset.
 
----
+The pipeline is:
 
-## General Note
+```text
+raw WFDB ECG files
+-> preprocessing
+-> processed .npy files
+-> PyTorch dataset
+-> CNN + BiGRU + Attention model
+-> 10-fold group cross-validation
+```
 
-This is **not a fixed framework**.
+## Data Layout
 
-You are expected to:
-- modify any script  
-- add or remove components  
-- adapt the pipeline to your dataset and task  
+The raw data should be placed here:
 
-The template only defines a **basic structure**.
+```text
+data/raw/Training_WFDB/
+data/raw/REFERENCE.csv
+```
 
----
+The preprocessing step creates processed files here:
 
-## Workflow
+```text
+data/processed/
+```
 
-1. `preprocessing.py`  
-   Load raw data (e.g., BIDS), clean and segment signals, and save processed data.
+Each processed subject file is saved as:
 
-2. `dataset.py`  
-   Load processed data and return samples.
+```python
+{
+    "signals": (num_segments, 12, 1500),
+    "labels": (num_segments, 9),
+    "subject_id": "A0001"
+}
+```
 
-3. `models.py`  
-   Define your model.
+The 1500 samples correspond to 6 seconds after downsampling to 250 Hz.
 
-4. `training.py`  
-   Train and evaluate the model.
+## Files
 
-Run everything with:
+`config.py`
+
+Stores the main settings, including paths, sampling rate, segment length, batch size, number of epochs, and evaluation protocol.
+
+`preprocessing.py`
+
+Loads the raw ECG signals, reads the labels, applies filtering, downsamples the signals, normalizes them, splits them into 6-second segments, and saves the processed `.npy` files.
+
+`dataset.py`
+
+Loads the processed `.npy` files and returns PyTorch samples containing `signal`, `label`, and `subject_id`.
+
+`model.py`
+
+Defines the CNN + BiGRU + Attention model. The model takes input with shape `(batch_size, 12, 1500)` and outputs 9 logits.
+
+`training.py`
+
+Handles the training loop, loss function, evaluation metrics, 10-fold group splitting, checkpoint saving, and result saving.
+
+`utils.py`
+
+Contains helper functions for creating folders, getting subject IDs, making evaluation splits, and checking for subject leakage.
+
+`main.py`
+
+Runs the full pipeline. It creates folders, runs preprocessing if processed files are missing, then starts training.
+
+## Model
+
+The model uses:
+
+```text
+5 x 1D convolution layers
+Batch normalization
+ReLU
+Max pooling
+Bidirectional GRU
+Attention
+Dropout
+Fully connected output layer
+```
+
+The model returns raw logits. Sigmoid is applied during evaluation, not inside the model.
+
+## Training Setup
+
+Current settings:
+
+```text
+Loss: BCEWithLogitsLoss
+Evaluation protocol: 10-fold Group K-Fold
+Epochs: 100
+Batch size: 32
+Metrics: macro F1, micro F1, macro ROC-AUC, per-class F1
+```
+
+Group K-Fold is used so that all segments from the same ECG recording stay in the same fold.
+
+## How To Run
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Run the full pipeline:
 
 ```bash
 python main.py
 ```
 
----
+On the first run, preprocessing creates the `.npy` files. On later runs, if processed files already exist, preprocessing is skipped and training starts directly.
 
-## Processed Data Format
+## Outputs
 
-Each saved file must contain:
+Training outputs are saved in:
 
-```python
-{
-    "signals": (N, C, T),
-    "labels": (N,),
-    "subject_id": identifier
-}
+```text
+outputs/models/
+outputs/results/
 ```
 
-- One file can correspond to a run, session, or any logical unit.  
-- Multiple files per subject are allowed.  
-- File naming is not restricted.
+The results folder contains:
 
----
-
-## Dimensions
-
-The template assumes input shape:
-
-```python
-(B, C, T)
+```text
+results.json
+summary.csv
 ```
 
-However, depending on your preprocessing and model, this can change.
+`results.json` stores the detailed fold and epoch history.
 
-You are responsible for ensuring:
-- consistency between preprocessing, dataset, and model  
-- correct input/output dimensions throughout the pipeline  
-
----
-
-## Model
-
-You must implement your own model in `models.py`.
-
-Requirements:
-- input: `(B, C, T)` (or your adapted format)  
-- output: task-dependent  
-
----
-
-## Training
-
-The provided `training.py` assumes a **classification task**:
-- loss: CrossEntropyLoss  
-- metric: accuracy  
-
-If your task is different (e.g., regression or segmentation), you must modify:
-- loss function  
-- model output  
-- evaluation metric  
-
----
-
-## Evaluation
-
-Supported protocols:
-- LOSO (Leave-One-Subject-Out)  
-- LMSO (Leave-Multiple-Subjects-Out)  
-- K-Fold (sample-level)  
-
-Subject-based splits are recommended for biomedical data.
-
----
-
-## Final Remark
-
-This template is only a starting point.
+`summary.csv` stores the final metrics for each fold and can be opened in Excel.
