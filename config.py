@@ -38,7 +38,7 @@ def get_config():
 
         "training": {
             "batch_size": 32,
-            "epochs": 100,
+            "epochs": 1,
             "learning_rate": 1e-3,
             "device": "cuda"  # change to "cpu" if needed
         },
