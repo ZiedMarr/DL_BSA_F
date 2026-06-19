@@ -5,5 +5,7 @@
 #SBATCH --ntasks-per-node=2
 #SBATCH --output=logs/job-%j.out
 #SBATCH --chdir=~/repo/DL_BSA_F
+export WANDB_PROJECT=ecg-classification
+export WANDB_ENTITY=zied-marrakchi2001
 
 apptainer run --nv ~/containers/python_container.sif python main.py
