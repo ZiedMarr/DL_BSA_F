@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=ecg_training
-#SBATCH --partition=gpu-test
+#SBATCH --partition=gpu-teaching-2h
 #SBATCH --gpus-per-node=1
 #SBATCH --ntasks-per-node=2
 #SBATCH --output=logs/job-%j.out
