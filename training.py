@@ -3,6 +3,7 @@
 import csv
 import json
 import os
+import wandb
 
 import numpy as np
 import torch
@@ -141,6 +142,8 @@ def run_experiment(config):
     protocol = config["evaluation"]["protocol"]
     splits = make_splits(config)
     results = []
+    # Initialize a wandb run
+    wandb.init()
 
     for fold, split in enumerate(splits):
         print(f"\nFold {fold + 1}")
@@ -209,6 +212,15 @@ def run_experiment(config):
                 }
             )
 
+            
+            #log to wandb:
+            wandb.log({"epoch": epoch,
+            "train_loss": loss,
+            "Macro-F1":metrics['macro_f1'],
+            "Macro-AUC":metrics['macro_auc'] })
+            
+                
+
         torch.save(
             model.state_dict(),
             os.path.join(
@@ -239,5 +251,6 @@ def run_experiment(config):
         print(f"Mean Macro-AUC: {sum(final_auc) / len(final_auc):.4f}")
 
     save_results(results, config)
+    wandb.finish()
 
     return results
