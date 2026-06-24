@@ -47,8 +47,12 @@ def visualize_signal(signal, channel, preprocess=False):
 
 if __name__ == "__main__":
     subj = form_subject_dict(signals_path, ref_path, 1222)
+    """
     visualize_signal(subj["signals"], 11, True)
     visualize_signal(subj["signals"], 11, False)
     plt.pause(0.001)
+    """
+    signal = preprocessing_pipeline(signal=subj["signals"])
+    print(f"signal len: {subj["signals"].shape}")
     input("Press Enter to close...")
 
