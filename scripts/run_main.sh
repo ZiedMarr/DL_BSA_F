@@ -7,5 +7,6 @@
 #SBATCH --chdir=/home/bsa05/repo/DL_BSA_F
 source ~/.wandb_key
 export WANDB_PROJECT=ecg-classification
+export WANDB_ENTITY=zied-marrakchi2001-technical-university-of-berlin
 
 apptainer run --nv ~/containers/bsa05_cont.sif python main.py
