@@ -211,6 +211,12 @@ def run_experiment(config):
 
         criterion = nn.BCEWithLogitsLoss()
         fold_history = []
+        best_f1 = -1.0
+        best_epoch_result = None
+        ckpt_path = os.path.join(
+            config["paths"]["checkpoints"],
+            f"{model_name}_fold{fold + 1}_best.pt",
+        )
 
         for epoch in range(config["training"]["epochs"]):
             loss = train_one_epoch(model, train_loader, optimizer, criterion, device)
@@ -223,13 +229,14 @@ def run_experiment(config):
                 f"Macro-AUC={metrics['macro_auc']}"
             )
 
-            fold_history.append(
-                {
-                    "epoch": epoch + 1,
-                    "loss": float(loss),
-                    **metrics,
-                }
-            )
+            epoch_result = {"epoch": epoch + 1, "loss": float(loss), **metrics}
+            fold_history.append(epoch_result)
+
+            if metrics["macro_f1"] > best_f1:
+                best_f1 = metrics["macro_f1"]
+                best_epoch_result = epoch_result
+                torch.save(model.state_dict(), ckpt_path)
+                print(f"  -> New best Macro-F1={best_f1:.4f}, checkpoint saved.")
 
             wandb.log(
                 {
@@ -239,21 +246,11 @@ def run_experiment(config):
                 },
                 step=epoch,
             )
-            
-                
-
-        torch.save(
-            model.state_dict(),
-            os.path.join(
-                config["paths"]["checkpoints"],
-                f"{config['model']['name']}_fold{fold}.pt",
-            ),
-        )
 
         results.append(
             {
                 "fold": fold + 1,
-                "final": fold_history[-1],
+                "final": best_epoch_result,
                 "history": fold_history,
             }
         )
