@@ -155,6 +155,7 @@ def run_experiment(config):
         wandb.init(
             group=group_name,
             name=f"fold_{fold + 1}",
+            reinit=True,
             config={
                 "model": model_name,
                 "learning_rate": lr,
