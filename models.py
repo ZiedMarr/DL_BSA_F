@@ -4,6 +4,9 @@ import torch
 import torch.nn as nn
 
 
+
+
+
 class Attention(nn.Module):
     def __init__(self, hidden_size):
         super().__init__()
@@ -49,7 +52,7 @@ class CNNBiGRUAttention(nn.Module):
         )
 
         self.attention = Attention(hidden_size=128)
-        self.dropout = nn.Dropout(0.3)
+        self.dropout = nn.Dropout(config["training"]["dropout"])
         self.fc = nn.Linear(128, num_classes)
 
     def forward(self, x):
@@ -138,7 +141,7 @@ class ResNet1D(nn.Module):
         self.block4 = ResBlock(128, 128)
 
         self.pool = nn.AdaptiveAvgPool1d(1)
-        self.dropout = nn.Dropout(0.3)
+        self.dropout = nn.Dropout(config["training"]["dropout"])
         self.fc = nn.Linear(128, num_classes)
 
     def forward(self, x):

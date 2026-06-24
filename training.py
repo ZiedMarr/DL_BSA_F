@@ -59,10 +59,11 @@ def macro_auc(y_true, y_prob):
     return float(np.mean(aucs))
 
 
-def evaluate(model, loader, device):
+def evaluate(model, loader, device, config):
     model.eval()
     true_labels = []
     probabilities = []
+    class_threshold = config["evaluation"]["class_threshold"]
 
     with torch.no_grad():
         for batch in loader:
@@ -142,10 +143,27 @@ def run_experiment(config):
     protocol = config["evaluation"]["protocol"]
     splits = make_splits(config)
     results = []
-    # Initialize a wandb run
-    wandb.init()
+    model_name = config["model"]["name"]
+    lr = config["training"]["learning_rate"]
+    bs = config["training"]["batch_size"]
+    epochs = config["training"]["epochs"]
+    class_threshold = config["evaluation"]["class_threshold"]
+    droput = config["training"]["dropout"]
+    group_name = f"{model_name}_lr{lr}_bs{bs}_clth{class_threshold}_drp{droput}"
 
     for fold, split in enumerate(splits):
+        wandb.init(
+            group=group_name,
+            name=f"fold_{fold + 1}",
+            config={
+                "model": model_name,
+                "learning_rate": lr,
+                "batch_size": bs,
+                "epochs": epochs,
+                "protocol": protocol,
+                "num_folds": config["evaluation"]["num_folds"],
+            },
+        )
         print(f"\nFold {fold + 1}")
 
         if protocol in ["loso", "lmso", "group_kfold"]:
@@ -195,7 +213,7 @@ def run_experiment(config):
 
         for epoch in range(config["training"]["epochs"]):
             loss = train_one_epoch(model, train_loader, optimizer, criterion, device)
-            metrics = evaluate(model, test_loader, device)
+            metrics = evaluate(model, test_loader, device, config)
 
             print(
                 f"Epoch {epoch + 1}: "
@@ -212,12 +230,14 @@ def run_experiment(config):
                 }
             )
 
-            
-            #log to wandb:
-            wandb.log({"epoch": epoch,
-            "train_loss": loss,
-            "Macro-F1":metrics['macro_f1'],
-            "Macro-AUC":metrics['macro_auc'] })
+            wandb.log(
+                {
+                    "train_loss": loss,
+                    "macro_f1": metrics["macro_f1"],
+                    "macro_auc": metrics["macro_auc"],
+                },
+                step=epoch,
+            )
             
                 
 
@@ -236,6 +256,7 @@ def run_experiment(config):
                 "history": fold_history,
             }
         )
+        wandb.finish()
 
     final_f1 = [fold["final"]["macro_f1"] for fold in results]
     final_auc = [
@@ -251,6 +272,5 @@ def run_experiment(config):
         print(f"Mean Macro-AUC: {sum(final_auc) / len(final_auc):.4f}")
 
     save_results(results, config)
-    wandb.finish()
 
     return results

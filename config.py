@@ -40,12 +40,14 @@ def get_config():
             "batch_size": 32,
             "epochs": 1,
             "learning_rate": 1e-3,
-            "device": "cuda"  # change to "cpu" if needed
+            "device": "cuda",  # change to "cpu" if needed
+            "dropout" : 0.3
         },
 
         "evaluation": {
             "protocol": "group_kfold",
-            "num_folds": 10
+            "num_folds": 10,
+            "class_threshold" : 0.5
         }
     }
 
