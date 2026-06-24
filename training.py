@@ -78,7 +78,7 @@ def evaluate(model, loader, device, config):
 
     y_true = np.concatenate(true_labels, axis=0)
     y_prob = np.concatenate(probabilities, axis=0)
-    y_pred = (y_prob >= 0.5).astype(np.float32)
+    y_pred = (y_prob >= class_threshold).astype(np.float32)
 
     per_class_f1 = f1_score(y_true, y_pred, average=None, zero_division=0)
 
