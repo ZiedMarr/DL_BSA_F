@@ -1,6 +1,21 @@
 # config.py
 
-def get_config():
+def _deep_merge(base, overrides):
+    """Recursively merge overrides into base, raising KeyError on unknown keys."""
+    for key, value in overrides.items():
+        if key not in base:
+            raise KeyError(
+                f"Override key '{key}' not found in config. "
+                f"Valid keys at this level: {list(base.keys())}"
+            )
+        if isinstance(base[key], dict) and isinstance(value, dict):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
+def get_config(overrides=None):
     config = {
         "paths": {
             "raw_data": "./data/raw/",
@@ -51,5 +66,8 @@ def get_config():
             "class_threshold" : 0.5
         }
     }
+
+    if overrides is not None:
+        _deep_merge(config, overrides)
 
     return config
