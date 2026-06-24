@@ -4,7 +4,6 @@ wandb
 numpy<2
 kaggle
 scikit-learn
-torch
 wfdb
 pandas
 neurokit2
