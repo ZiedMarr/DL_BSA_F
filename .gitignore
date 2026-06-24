@@ -8,3 +8,4 @@ data/
 wandb/
 *.pyc
 scripts/run_main.sh
+container/

@@ -38,7 +38,7 @@ def get_config():
 
         "training": {
             "batch_size": 32,
-            "epochs": 1,
+            "epochs": 2,
             "learning_rate": 1e-3,
             "device": "cuda",  # change to "cpu" if needed
             "dropout" : 0.3
