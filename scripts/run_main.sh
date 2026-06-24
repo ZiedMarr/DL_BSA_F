@@ -8,4 +8,4 @@
 source ~/.wandb_key
 export WANDB_PROJECT=ecg-classification
 
-apptainer run --nv ~/containers/python_bsa05_container.sif python main.py
+apptainer run --nv ~/containers/bsa05_cont.sif python main.py
