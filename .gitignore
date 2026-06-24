@@ -5,3 +5,4 @@ env/
 .kaggle/
 data/
 *.egg-info/
+wandb/
