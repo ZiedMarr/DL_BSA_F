@@ -1,8 +1,19 @@
 # utils.py
 
 import os
+import random
 import numpy as np
+import torch
 from sklearn.model_selection import KFold
+
+
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def get_subject_ids(data_path):
@@ -31,8 +42,8 @@ def loso_split(subject_ids):
     return splits
 
 
-def lmso_split(subject_ids, k=5):
-    kf = KFold(n_splits=k, shuffle=True, random_state=42)
+def lmso_split(subject_ids, k=5, random_state=42):
+    kf = KFold(n_splits=k, shuffle=True, random_state=random_state)
     splits = []
 
     for train_idx, test_idx in kf.split(subject_ids):
@@ -44,9 +55,9 @@ def lmso_split(subject_ids, k=5):
     return splits
 
 
-def group_kfold_split(subject_ids, k=10):
+def group_kfold_split(subject_ids, k=10, random_state=42):
     # Keep all segments from the same recording in the same fold.
-    kf = KFold(n_splits=k, shuffle=True, random_state=42)
+    kf = KFold(n_splits=k, shuffle=True, random_state=random_state)
     splits = []
 
     for train_idx, test_idx in kf.split(subject_ids):
@@ -57,8 +68,8 @@ def group_kfold_split(subject_ids, k=10):
     return splits
 
 
-def kfold_split_indices(n_samples, k=5):
-    kf = KFold(n_splits=k, shuffle=True, random_state=42)
+def kfold_split_indices(n_samples, k=5, random_state=42):
+    kf = KFold(n_splits=k, shuffle=True, random_state=random_state)
 
     splits = []
     indices = np.arange(n_samples)

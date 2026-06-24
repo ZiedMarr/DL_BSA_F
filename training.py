@@ -20,6 +20,7 @@ from utils import (
     kfold_split_indices,
     lmso_split,
     loso_split,
+    set_seed,
 )
 
 
@@ -116,7 +117,7 @@ def save_results(results, config):
             )
 
 
-def make_splits(config):
+def make_splits(config, seed):
     protocol = config["evaluation"]["protocol"]
     num_folds = config["evaluation"]["num_folds"]
 
@@ -127,13 +128,13 @@ def make_splits(config):
             return loso_split(subject_ids)
 
         if protocol == "lmso":
-            return lmso_split(subject_ids, k=num_folds)
+            return lmso_split(subject_ids, k=num_folds, random_state=seed)
 
-        return group_kfold_split(subject_ids, k=num_folds)
+        return group_kfold_split(subject_ids, k=num_folds, random_state=seed)
 
     if protocol == "kfold":
         full_dataset = BiosignalDataset(config, subject_ids=None)
-        return kfold_split_indices(len(full_dataset), num_folds)
+        return kfold_split_indices(len(full_dataset), num_folds, random_state=seed)
 
     raise ValueError(f"Unknown evaluation protocol: {protocol}")
 
@@ -141,17 +142,20 @@ def make_splits(config):
 def run_experiment(config):
     device = config["training"]["device"]
     protocol = config["evaluation"]["protocol"]
-    splits = make_splits(config)
     results = []
     model_name = config["model"]["name"]
     lr = config["training"]["learning_rate"]
     bs = config["training"]["batch_size"]
     epochs = config["training"]["epochs"]
     class_threshold = config["evaluation"]["class_threshold"]
-    droput = config["training"]["dropout"]
-    group_name = f"{model_name}_lr{lr}_bs{bs}_clth{class_threshold}_drp{droput}"
+    dropout = config["training"]["dropout"]
+    seed = config["training"]["seed"]
+    group_name = f"{model_name}_lr{lr}_bs{bs}_clth{class_threshold}_drp{dropout}"
+    splits = make_splits(config, seed)
 
     for fold, split in enumerate(splits):
+        fold_seed = seed + fold
+        set_seed(fold_seed)
         wandb.init(
             group=group_name,
             name=f"fold_{fold + 1}",
@@ -163,6 +167,9 @@ def run_experiment(config):
                 "epochs": epochs,
                 "protocol": protocol,
                 "num_folds": config["evaluation"]["num_folds"],
+                "class_threshold": class_threshold,
+                "dropout": dropout,
+                "seed": fold_seed,
             },
         )
         print(f"\nFold {fold + 1}")

@@ -41,7 +41,8 @@ def get_config():
             "epochs": 2,
             "learning_rate": 1e-3,
             "device": "cuda",  # change to "cpu" if needed
-            "dropout" : 0.3
+            "dropout" : 0.3,
+            "seed": 42
         },
 
         "evaluation": {
