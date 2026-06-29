@@ -1,27 +1,28 @@
 # training.py
 
-import os
+import csv
 import json
+import os
+
+import numpy as np
 import torch
 import torch.nn as nn
+from sklearn.metrics import f1_score, roc_auc_score
 from torch.utils.data import DataLoader, Subset
 import wandb
 
 
 from dataset import BiosignalDataset
-from model import Model
+from models import get_model
 from utils import (
+    check_no_leakage,
     get_subject_ids,
-    loso_split,
-    lmso_split,
+    group_kfold_split,
     kfold_split_indices,
-    check_no_leakage
+    lmso_split,
+    loso_split,
 )
 
-
-# -------------------------
-# Training helpers
-# -------------------------
 
 def train_one_epoch(model, loader, optimizer, criterion, device):
     model.train()
@@ -30,8 +31,6 @@ def train_one_epoch(model, loader, optimizer, criterion, device):
     for batch in loader:
         x = batch["signal"].to(device)
         y = batch["label"].to(device)
-
-        assert x.ndim == 3, f"Expected (B, C, T), got {x.shape}"
 
         optimizer.zero_grad()
         outputs = model(x)
@@ -44,169 +43,202 @@ def train_one_epoch(model, loader, optimizer, criterion, device):
     return total_loss / len(loader)
 
 
+def macro_auc(y_true, y_prob):
+    aucs = []
+
+    for class_idx in range(y_true.shape[1]):
+        class_true = y_true[:, class_idx]
+
+        if len(np.unique(class_true)) < 2:
+            continue
+
+        aucs.append(roc_auc_score(class_true, y_prob[:, class_idx]))
+
+    if len(aucs) == 0:
+        return None
+
+    return float(np.mean(aucs))
+
+
 def evaluate(model, loader, device):
     model.eval()
-    correct = 0
-    total = 0
+    true_labels = []
+    probabilities = []
 
     with torch.no_grad():
         for batch in loader:
             x = batch["signal"].to(device)
-            y = batch["label"].to(device)
+            y = batch["label"]
 
             outputs = model(x)
-            preds = (torch.sigmoid(outputs) >= 0.5).float()
+            probs = torch.sigmoid(outputs).cpu()
 
-            correct += (preds == y).all(dim=1).sum().item()
-            total += y.size(0)
+            true_labels.append(y.numpy())
+            probabilities.append(probs.numpy())
 
-    return correct / total
+    y_true = np.concatenate(true_labels, axis=0)
+    y_prob = np.concatenate(probabilities, axis=0)
+    y_pred = (y_prob >= 0.5).astype(np.float32)
+
+    per_class_f1 = f1_score(y_true, y_pred, average=None, zero_division=0)
+
+    return {
+        "macro_f1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+        "micro_f1": float(f1_score(y_true, y_pred, average="micro", zero_division=0)),
+        "macro_auc": macro_auc(y_true, y_prob),
+        "per_class_f1": per_class_f1.tolist(),
+    }
 
 
 def save_results(results, config):
-    path = os.path.join(config["paths"]["results"], "results.json")
-    with open(path, "w") as f:
+    results_path = config["paths"]["results"]
+    model_name = config["model"]["name"]
+    json_path = os.path.join(results_path, f"{model_name}_results.json")
+    csv_path = os.path.join(results_path, f"{model_name}_summary.csv")
+
+    with open(json_path, "w") as f:
         json.dump({"results": results}, f, indent=4)
 
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["fold", "loss", "macro_f1", "micro_f1", "macro_auc"])
 
-# -------------------------
-# Main experiment
-# -------------------------
+        for fold_result in results:
+            final = fold_result["final"]
+            writer.writerow(
+                [
+                    fold_result["fold"],
+                    final["loss"],
+                    final["macro_f1"],
+                    final["micro_f1"],
+                    final["macro_auc"],
+                ]
+            )
 
-def run_experiment(config):
 
-    # Initialize wandb
-    wandb.init(
-    project=config.PROJECT_NAME,
-    name=config.EXPERIMENT_NAME,
-    config=vars(config)
-)
-
-    device = config["training"]["device"]
+def make_splits(config):
     protocol = config["evaluation"]["protocol"]
+    num_folds = config["evaluation"]["num_folds"]
 
-    results = []
-
-    # -------------------------
-    # SPLIT CREATION
-    # -------------------------
-
-    if protocol in ["loso", "lmso"]:
+    if protocol in ["loso", "lmso", "group_kfold"]:
         subject_ids = get_subject_ids(config["paths"]["processed_data"])
 
         if protocol == "loso":
-            splits = loso_split(subject_ids)
+            return loso_split(subject_ids)
 
-        elif protocol == "lmso":
-            splits = lmso_split(subject_ids, n_test_subjects=2)
+        if protocol == "lmso":
+            return lmso_split(subject_ids, k=num_folds)
 
-    elif protocol == "kfold":
+        return group_kfold_split(subject_ids, k=num_folds)
+
+    if protocol == "kfold":
         full_dataset = BiosignalDataset(config, subject_ids=None)
-        splits = kfold_split_indices(len(full_dataset), config["evaluation"]["num_folds"])
+        return kfold_split_indices(len(full_dataset), num_folds)
 
-    else:
-        raise ValueError("Unknown evaluation protocol")
+    raise ValueError(f"Unknown evaluation protocol: {protocol}")
 
-    # -------------------------
-    # TRAINING LOOP
-    # -------------------------
+
+def run_experiment(config):
+    device = config["training"]["device"]
+    protocol = config["evaluation"]["protocol"]
+    splits = make_splits(config)
+    results = []
 
     for fold, split in enumerate(splits):
-        print(f"\nFold {fold+1}")
+        print(f"\nFold {fold + 1}")
 
-        # -------------------------
-        # Dataset creation
-        # -------------------------
-
-        if protocol in ["loso", "lmso"]:
+        if protocol in ["loso", "lmso", "group_kfold"]:
             train_sids, test_sids = split
-
             check_no_leakage(train_sids, test_sids)
 
             train_dataset = BiosignalDataset(config, train_sids)
             test_dataset = BiosignalDataset(config, test_sids)
 
-        else:  # kfold
+        else:
             train_idx, test_idx = split
-
             full_dataset = BiosignalDataset(config, subject_ids=None)
-
             train_dataset = Subset(full_dataset, train_idx)
             test_dataset = Subset(full_dataset, test_idx)
-
-        # -------------------------
-        # DataLoaders
-        # -------------------------
 
         train_loader = DataLoader(
             train_dataset,
             batch_size=config["training"]["batch_size"],
-            shuffle=True
+            shuffle=True,
         )
 
         test_loader = DataLoader(
             test_dataset,
             batch_size=config["training"]["batch_size"],
-            shuffle=False
+            shuffle=False,
         )
 
-        # -------------------------
-        # Model
-        # -------------------------
-
-        model = Model(config).to(device)
-
-        # sanity check
+        model = get_model(config).to(device)
         dummy = torch.randn(
             2,
             config["dataset"]["input_channels"],
-            config["dataset"]["segment_length"]
+            config["dataset"]["segment_length"],
         ).to(device)
 
         try:
             _ = model(dummy)
-        except Exception as e:
-            raise RuntimeError(f"Model forward failed: {e}")
+        except Exception as exc:
+            raise RuntimeError(f"Model forward failed: {exc}") from exc
 
         optimizer = torch.optim.Adam(
             model.parameters(),
-            lr=config["training"]["learning_rate"]
+            lr=config["training"]["learning_rate"],
         )
         #TODO : choose the right Loss
         criterion = nn.BCEWithLogitsLoss()
-
-        # -------------------------
-        # Training
-        # -------------------------
+        fold_history = []
 
         for epoch in range(config["training"]["epochs"]):
             loss = train_one_epoch(model, train_loader, optimizer, criterion, device)
-            acc = evaluate(model, test_loader, device)
+            metrics = evaluate(model, test_loader, device)
 
-            print(f"Epoch {epoch+1}: Loss={loss:.4f}, Acc={acc:.4f}")
+            print(
+                f"Epoch {epoch + 1}: "
+                f"Loss={loss:.4f}, "
+                f"Macro-F1={metrics['macro_f1']:.4f}, "
+                f"Macro-AUC={metrics['macro_auc']}"
+            )
 
-            # Log results to wandB
-            wandb.log({
-            "train_loss": loss,
-            "accuracy": acc
-            })
-
-        # -------------------------
-        # Save checkpoint
-        # -------------------------
+            fold_history.append(
+                {
+                    "epoch": epoch + 1,
+                    "loss": float(loss),
+                    **metrics,
+                }
+            )
 
         torch.save(
             model.state_dict(),
-            os.path.join(config["paths"]["checkpoints"], f"model_fold{fold}.pt")
+            os.path.join(
+                config["paths"]["checkpoints"],
+                f"{config['model']['name']}_fold{fold}.pt",
+            ),
         )
 
-        # finish wandB 
-        wandb.finish()
-        
-        results.append(acc)
+        results.append(
+            {
+                "fold": fold + 1,
+                "final": fold_history[-1],
+                "history": fold_history,
+            }
+        )
 
-    print("\nFinal Results:", results)
-    print("Mean Accuracy:", sum(results) / len(results))
+    final_f1 = [fold["final"]["macro_f1"] for fold in results]
+    final_auc = [
+        fold["final"]["macro_auc"]
+        for fold in results
+        if fold["final"]["macro_auc"] is not None
+    ]
+
+    print("\nFinal Results")
+    print(f"Mean Macro-F1: {sum(final_f1) / len(final_f1):.4f}")
+
+    if len(final_auc) > 0:
+        print(f"Mean Macro-AUC: {sum(final_auc) / len(final_auc):.4f}")
 
     save_results(results, config)
 

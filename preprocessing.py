@@ -40,16 +40,14 @@ def preprocess_dataset(config):
         print(f"Processing {subject_id} ({i}/{num_pat})")
         try:
             subject_dict = form_subject_dict(signals_path=signals_path, reference_df=reference_df, subject_number=i, config=config)
+            subject_dict["signals"] = preprocessing_pipeline(subject_dict["signals"], config=config)
+            segmented_list = segmentation(subject_dict=subject_dict, segment_size=segment_size, overlap_ratio=overlap_ratio)
+            segments_saved = save_subject_file(segmented_list, config=config)
         except Exception as e:
             print(f"Skipping {subject_id}: {e}")
             subjects_skipped += 1
             continue
-        # preprocess the signals
-        subject_dict["signals"] = preprocessing_pipeline(subject_dict["signals"], config=config)
-        # Segment signal
-        segmented_list = segmentation(subject_dict=subject_dict, segment_size=segment_size, overlap_ratio=overlap_ratio)
-        # Save to a file
-        segments_saved = save_subject_file(segmented_list, config=config)
+
         if segments_saved == 0:
             subjects_skipped += 1
             print(f"Skipping {subject_id}: no segments created")
@@ -141,11 +139,11 @@ def preprocessing_pipeline(signal, config=None):
     if config is None:
         config = cfg
     # Notch Filter : removing Powerline 
-    filtered = _notch(signal)
+    filtered = _notch(signal, config)
     # bandpass butterworth filter
-    filtered = _butterworth(filtered)
+    filtered = _butterworth(filtered, config)
     #downsample signal
-    down_sampeled = _downsample(filtered)
+    down_sampeled = _downsample(filtered, config)
     #z_score_norm
     normalized = _z_score_norm(down_sampeled)
     
@@ -153,31 +151,42 @@ def preprocessing_pipeline(signal, config=None):
     return normalized
 
 
-def _baseline_wander_remove(signal):
+def _baseline_wander_remove(signal, config=None):
+    if config is None:
+        config = cfg
+    sampling_rate = config["dataset"]["sampling_rate"]
      # removing Baseline Wander
     filtered = np.stack([nk.signal_filter(signal[:,c], sampling_rate, method='savgol') for c in range(signal.shape[1])], axis=1)
     return filtered
 
 
-def _notch(signal):
-    powerline = cfg["preprocess"]["powerline"]
+def _notch(signal, config=None):
+    if config is None:
+        config = cfg
+    sampling_rate = config["dataset"]["sampling_rate"]
+    powerline = config["preprocess"]["powerline"]
      # Notch Filter : removing Powerline 
     filtered = np.stack([nk.signal_filter(signal[:,c], sampling_rate, method='powerline', powerline=powerline) for c in range(signal.shape[1])], axis=1)
     return filtered
 
 
-def _butterworth(signal):
-    lowcut = cfg["preprocess"]["lowcut"]
-    highcut = cfg["preprocess"]["highcut"]
+def _butterworth(signal, config=None):
+    if config is None:
+        config = cfg
+    sampling_rate = config["dataset"]["sampling_rate"]
+    lowcut = config["preprocess"]["lowcut"]
+    highcut = config["preprocess"]["highcut"]
     # bandpass butterworth filter
     filtered = np.stack([nk.signal_filter(signal[:,c], sampling_rate, lowcut=lowcut, highcut=highcut, method='butterworth') for c in range(signal.shape[1])], axis=1)
     return filtered
 
 
-def _downsample(signal):
+def _downsample(signal, config=None):
+    if config is None:
+        config = cfg
     #get the fs rates
-    original_fs = cfg["dataset"]["sampling_rate"]
-    target_fs = cfg["preprocess"]["downsampled_rate"]
+    original_fs = config["dataset"]["sampling_rate"]
+    target_fs = config["preprocess"]["downsampled_rate"]
     # greatest common denominator
     g = gcd(original_fs, target_fs)
     # get the downsampling coefficients

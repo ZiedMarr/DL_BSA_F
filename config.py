@@ -10,7 +10,7 @@ def get_config():
             "raw_data": "./data/raw/",
             "processed_data": "./data/processed/",
             "outputs": "./outputs/",
-            "checkpoints": "./outputs/checkpoints/",
+            "checkpoints": "./outputs/models/",
             "results": "./outputs/results/",
             "plots": "./outputs/plots/"
         },
@@ -28,6 +28,10 @@ def get_config():
             "sampling_rate" : 500
         },
 
+        "model": {
+            "name": "cnn1d"
+        },
+
         "preprocess": {
             "powerline" : 50,
             "lowcut" : 0.5,
@@ -38,14 +42,14 @@ def get_config():
 
         "training": {
             "batch_size": 32,
-            "epochs": 20,
+            "epochs": 100,
             "learning_rate": 1e-3,
             "device": "cuda"  # change to "cpu" if needed
         },
 
         "evaluation": {
-            "protocol": "loso",  # "loso" or "kfold"
-            "num_folds": 5
+            "protocol": "group_kfold",
+            "num_folds": 10
         }
     }
 
