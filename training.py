@@ -93,6 +93,7 @@ def save_results(results, config):
     model_name = config["model"]["name"]
     json_path = os.path.join(results_path, f"{model_name}_results.json")
     csv_path = os.path.join(results_path, f"{model_name}_summary.csv")
+    metrics = ["loss", "macro_f1", "micro_f1", "macro_auc"]
 
     with open(json_path, "w") as f:
         json.dump({"results": results}, f, indent=4)
@@ -110,6 +111,24 @@ def save_results(results, config):
                     final["macro_f1"],
                     final["micro_f1"],
                     final["macro_auc"],
+                ]
+            )
+
+        writer.writerow([])
+        writer.writerow(["metric", "mean", "std"])
+
+        for metric in metrics:
+            values = [
+                fold_result["final"][metric]
+                for fold_result in results
+                if fold_result["final"][metric] is not None
+            ]
+
+            writer.writerow(
+                [
+                    metric,
+                    float(np.mean(values)),
+                    float(np.std(values)),
                 ]
             )
 

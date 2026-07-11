@@ -5,3 +5,6 @@ env/
 .kaggle/
 data/
 *.egg-info/
+outputs/
+plot_results.py
+summarize_results.py

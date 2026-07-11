@@ -8,9 +8,11 @@ class Attention(nn.Module):
     def __init__(self, hidden_size):
         super().__init__()
         self.score = nn.Linear(hidden_size, 1)
+        self.last_weights = None
 
     def forward(self, x):
         weights = torch.softmax(self.score(x), dim=1)
+        self.last_weights = weights.detach()
         return torch.sum(weights * x, dim=1)
 
 
