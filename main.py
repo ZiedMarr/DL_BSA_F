@@ -20,6 +20,11 @@ def parse_args():
         type=int,
         help="Number of training epochs. If not set, config.py is used.",
     )
+    parser.add_argument(
+        "--class-weights",
+        action="store_true",
+        help="Use class-weighted BCE loss.",
+    )
     return parser.parse_args()
 
 
@@ -41,6 +46,9 @@ def main():
 
     if args.epochs is not None:
         config["training"]["epochs"] = args.epochs
+
+    if args.class_weights:
+        config["training"]["class_weights"] = True
 
     create_folders(config)
 

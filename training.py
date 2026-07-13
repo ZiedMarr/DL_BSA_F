@@ -58,20 +58,26 @@ def macro_auc(y_true, y_prob):
     return float(np.mean(aucs))
 
 
-def evaluate(model, loader, device):
+def evaluate(model, loader, device, criterion=None):
     model.eval()
     true_labels = []
     probabilities = []
+    total_loss = 0
 
     with torch.no_grad():
         for batch in loader:
             x = batch["signal"].to(device)
-            y = batch["label"]
+            y = batch["label"].to(device)
 
             outputs = model(x)
+
+            if criterion is not None:
+                loss = criterion(outputs, y)
+                total_loss += loss.item()
+
             probs = torch.sigmoid(outputs).cpu()
 
-            true_labels.append(y.numpy())
+            true_labels.append(y.cpu().numpy())
             probabilities.append(probs.numpy())
 
     y_true = np.concatenate(true_labels, axis=0)
@@ -80,27 +86,54 @@ def evaluate(model, loader, device):
 
     per_class_f1 = f1_score(y_true, y_pred, average=None, zero_division=0)
 
-    return {
+    metrics = {
         "macro_f1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
         "micro_f1": float(f1_score(y_true, y_pred, average="micro", zero_division=0)),
         "macro_auc": macro_auc(y_true, y_prob),
         "per_class_f1": per_class_f1.tolist(),
     }
 
+    if criterion is not None:
+        metrics["val_loss"] = float(total_loss / len(loader))
+
+    return metrics
+
+
+def get_class_weights(dataset, device, num_classes):
+    label_counts = np.zeros(num_classes, dtype=np.float32)
+
+    for item in dataset:
+        label_counts += item["label"].numpy()
+
+    total = len(dataset)
+    neg_counts = total - label_counts
+    weights = neg_counts / np.maximum(label_counts, 1)
+
+    return torch.tensor(weights, dtype=torch.float32).to(device)
+
+
+def result_name(config):
+    name = config["model"]["name"]
+
+    if config["training"].get("class_weights", False):
+        return f"{name}_weighted"
+
+    return name
+
 
 def save_results(results, config):
     results_path = config["paths"]["results"]
-    model_name = config["model"]["name"]
+    model_name = result_name(config)
     json_path = os.path.join(results_path, f"{model_name}_results.json")
     csv_path = os.path.join(results_path, f"{model_name}_summary.csv")
-    metrics = ["loss", "macro_f1", "micro_f1", "macro_auc"]
+    metrics = ["loss", "val_loss", "macro_f1", "micro_f1", "macro_auc"]
 
     with open(json_path, "w") as f:
         json.dump({"results": results}, f, indent=4)
 
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["fold", "loss", "macro_f1", "micro_f1", "macro_auc"])
+        writer.writerow(["fold", "loss", "val_loss", "macro_f1", "micro_f1", "macro_auc"])
 
         for fold_result in results:
             final = fold_result["final"]
@@ -108,6 +141,7 @@ def save_results(results, config):
                 [
                     fold_result["fold"],
                     final["loss"],
+                    final.get("val_loss"),
                     final["macro_f1"],
                     final["micro_f1"],
                     final["macro_auc"],
@@ -121,8 +155,11 @@ def save_results(results, config):
             values = [
                 fold_result["final"][metric]
                 for fold_result in results
-                if fold_result["final"][metric] is not None
+                if metric in fold_result["final"] and fold_result["final"][metric] is not None
             ]
+
+            if len(values) == 0:
+                continue
 
             writer.writerow(
                 [
@@ -206,16 +243,26 @@ def run_experiment(config):
             lr=config["training"]["learning_rate"],
         )
 
-        criterion = nn.BCEWithLogitsLoss()
+        if config["training"].get("class_weights", False):
+            class_weights = get_class_weights(
+                train_dataset,
+                device,
+                config["dataset"]["num_classes"],
+            )
+            criterion = nn.BCEWithLogitsLoss(pos_weight=class_weights)
+        else:
+            criterion = nn.BCEWithLogitsLoss()
+
         fold_history = []
 
         for epoch in range(config["training"]["epochs"]):
             loss = train_one_epoch(model, train_loader, optimizer, criterion, device)
-            metrics = evaluate(model, test_loader, device)
+            metrics = evaluate(model, test_loader, device, criterion)
 
             print(
                 f"Epoch {epoch + 1}: "
                 f"Loss={loss:.4f}, "
+                f"Val-Loss={metrics['val_loss']:.4f}, "
                 f"Macro-F1={metrics['macro_f1']:.4f}, "
                 f"Macro-AUC={metrics['macro_auc']}"
             )
@@ -232,7 +279,7 @@ def run_experiment(config):
             model.state_dict(),
             os.path.join(
                 config["paths"]["checkpoints"],
-                f"{config['model']['name']}_fold{fold}.pt",
+                f"{result_name(config)}_fold{fold}.pt",
             ),
         )
 
