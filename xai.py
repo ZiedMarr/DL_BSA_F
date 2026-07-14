@@ -8,10 +8,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
+from scipy.signal import find_peaks
 
 from config import get_config
 from dataset import BiosignalDataset
 from models import get_model
+
+LEAD_NAMES = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"]
 
 
 def parse_args():
@@ -20,10 +23,18 @@ def parse_args():
     parser.add_argument("--checkpoint", default=None)
     parser.add_argument("--output-name", default=None)
     parser.add_argument("--target-class", type=int, default=6)
+    parser.add_argument("--classes", default=None)
     parser.add_argument("--all-classes", action="store_true")
     parser.add_argument("--lead", type=int, default=1)
+    parser.add_argument("--leads", default=None)
     parser.add_argument("--max-check", type=int, default=4000)
+    parser.add_argument("--qrs", action="store_true")
+    parser.add_argument("--notes-name", default="xai_clinical_notes.csv")
     return parser.parse_args()
+
+
+def parse_number_list(value):
+    return [int(item.strip()) for item in value.split(",") if item.strip()]
 
 
 def load_model(config, checkpoint, device):
@@ -131,9 +142,18 @@ def find_examples(model, dataset, device, class_idx, max_check):
     return correct, wrong
 
 
-def plot_xai(signal, heatmap, title, out_path, lead_idx):
+def qrs_peaks(lead_signal, fs):
+    signal = np.abs(lead_signal - np.median(lead_signal))
+    distance = int(0.25 * fs)
+    height = np.percentile(signal, 90)
+    peaks, _ = find_peaks(signal, distance=distance, height=height)
+    return peaks
+
+
+def plot_xai(signal, heatmap, title, out_path, lead_idx, fs, show_qrs):
     lead_signal = signal[lead_idx]
     t = np.arange(len(lead_signal))
+    lead_name = LEAD_NAMES[lead_idx] if lead_idx < len(LEAD_NAMES) else f"Lead {lead_idx + 1}"
 
     fig, ax = plt.subplots(figsize=(12, 4))
     ax.plot(t, lead_signal, color="black", linewidth=1)
@@ -144,17 +164,24 @@ def plot_xai(signal, heatmap, title, out_path, lead_idx):
         alpha=0.35,
         extent=[0, len(lead_signal), lead_signal.min(), lead_signal.max()],
     )
+
+    if show_qrs:
+        for peak in qrs_peaks(lead_signal, fs):
+            ax.axvline(peak, color="white", linestyle="--", linewidth=0.8, alpha=0.75)
+
     ax.set_title(title)
     ax.set_xlabel("Samples")
-    ax.set_ylabel(f"Lead {lead_idx + 1}")
+    ax.set_ylabel(lead_name)
     fig.tight_layout()
     fig.savefig(out_path, dpi=200)
     plt.close(fig)
 
 
-def explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, tag):
+def explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, tag, fs, show_qrs):
     signal = item["signal"].numpy()
     x = item["signal"].unsqueeze(0).to(next(model.parameters()).device)
+    lead_name = LEAD_NAMES[lead_idx] if lead_idx < len(LEAD_NAMES) else f"lead{lead_idx + 1}"
+    lead_tag = lead_name.replace(" ", "").replace("/", "")
 
     # Grad-CAM on the last CNN layer
     gradcam = GradCam1D(model, get_target_layer(model, model_name))
@@ -165,9 +192,11 @@ def explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx
     plot_xai(
         signal,
         cam,
-        f"{save_name} Grad-CAM ({tag}, {class_name}, prob={prob[class_idx]:.3f})",
-        os.path.join(out_dir, f"{save_name}_{class_name}_{tag}_gradcam.png"),
+        f"{save_name} Grad-CAM ({tag}, {class_name}, {lead_name}, prob={prob[class_idx]:.3f})",
+        os.path.join(out_dir, f"{save_name}_{class_name}_{tag}_{lead_tag}_gradcam.png"),
         lead_idx,
+        fs,
+        show_qrs,
     )
 
     if model_name == "cnn1d":
@@ -175,14 +204,16 @@ def explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx
         plot_xai(
             signal,
             attn,
-            f"{save_name} Attention ({tag}, {class_name}, prob={prob[class_idx]:.3f})",
-            os.path.join(out_dir, f"{save_name}_{class_name}_{tag}_attention.png"),
+            f"{save_name} Attention ({tag}, {class_name}, {lead_name}, prob={prob[class_idx]:.3f})",
+            os.path.join(out_dir, f"{save_name}_{class_name}_{tag}_{lead_tag}_attention.png"),
             lead_idx,
+            fs,
+            show_qrs,
         )
 
 
-def write_xai_notes(out_dir, rows):
-    path = os.path.join(out_dir, "xai_clinical_notes.csv")
+def write_xai_notes(out_dir, rows, notes_name):
+    path = os.path.join(out_dir, notes_name)
     exists = os.path.isfile(path)
 
     with open(path, "a", newline="") as f:
@@ -194,6 +225,7 @@ def write_xai_notes(out_dir, rows):
                     "model",
                     "class",
                     "example_type",
+                    "lead",
                     "sample_idx",
                     "probability",
                     "plot_files",
@@ -205,34 +237,36 @@ def write_xai_notes(out_dir, rows):
             writer.writerow(row)
 
 
-def run_for_class(model, model_name, save_name, dataset, device, class_idx, lead_idx, out_dir, max_check):
+def run_for_class(model, model_name, save_name, dataset, device, class_idx, lead_idx, out_dir, max_check, fs, show_qrs):
     rows = []
     correct, wrong = find_examples(model, dataset, device, class_idx, max_check)
     class_name = f"class{class_idx + 1}"
+    lead_name = LEAD_NAMES[lead_idx] if lead_idx < len(LEAD_NAMES) else f"Lead {lead_idx + 1}"
+    lead_tag = lead_name.replace(" ", "").replace("/", "")
 
     if correct is not None:
         idx, item, prob = correct
-        print(f"{class_name} correct example: sample {idx}")
-        explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, "correct")
+        print(f"{class_name} correct example: sample {idx}, {lead_name}")
+        explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, "correct", fs, show_qrs)
 
-        files = [f"{save_name}_{class_name}_correct_gradcam.png"]
+        files = [f"{save_name}_{class_name}_correct_{lead_tag}_gradcam.png"]
         if model_name == "cnn1d":
-            files.append(f"{save_name}_{class_name}_correct_attention.png")
+            files.append(f"{save_name}_{class_name}_correct_{lead_tag}_attention.png")
 
-        rows.append([save_name, class_idx + 1, "correct", idx, prob[class_idx], "; ".join(files), ""])
+        rows.append([save_name, class_idx + 1, "correct", lead_name, idx, prob[class_idx], "; ".join(files), ""])
     else:
         print(f"{class_name}: no correct positive example found.")
 
     if wrong is not None:
         idx, item, prob = wrong
-        print(f"{class_name} wrong example: sample {idx}")
-        explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, "wrong")
+        print(f"{class_name} wrong example: sample {idx}, {lead_name}")
+        explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, "wrong", fs, show_qrs)
 
-        files = [f"{save_name}_{class_name}_wrong_gradcam.png"]
+        files = [f"{save_name}_{class_name}_wrong_{lead_tag}_gradcam.png"]
         if model_name == "cnn1d":
-            files.append(f"{save_name}_{class_name}_wrong_attention.png")
+            files.append(f"{save_name}_{class_name}_wrong_{lead_tag}_attention.png")
 
-        rows.append([save_name, class_idx + 1, "wrong", idx, prob[class_idx], "; ".join(files), ""])
+        rows.append([save_name, class_idx + 1, "wrong", lead_name, idx, prob[class_idx], "; ".join(files), ""])
     else:
         print(f"{class_name}: no wrong example found.")
 
@@ -259,34 +293,43 @@ def main():
     out_dir = os.path.join(config["paths"]["outputs"], "xai")
     os.makedirs(out_dir, exist_ok=True)
 
-    lead_idx = args.lead - 1
+    if args.leads is not None:
+        lead_list = [lead - 1 for lead in parse_number_list(args.leads)]
+    else:
+        lead_list = [args.lead - 1]
 
     dataset = BiosignalDataset(config)
     model = load_model(config, checkpoint, device)
 
     if args.all_classes:
         class_list = list(range(config["dataset"]["num_classes"]))
+    elif args.classes is not None:
+        class_list = [class_num - 1 for class_num in parse_number_list(args.classes)]
     else:
         class_list = [args.target_class - 1]
 
+    fs = config["preprocess"]["downsampled_rate"]
     note_rows = []
 
     for class_idx in class_list:
-        note_rows.extend(
-            run_for_class(
-                model,
-                args.model,
-                save_name,
-                dataset,
-                device,
-                class_idx,
-                lead_idx,
-                out_dir,
-                args.max_check,
+        for lead_idx in lead_list:
+            note_rows.extend(
+                run_for_class(
+                    model,
+                    args.model,
+                    save_name,
+                    dataset,
+                    device,
+                    class_idx,
+                    lead_idx,
+                    out_dir,
+                    args.max_check,
+                    fs,
+                    args.qrs,
+                )
             )
-        )
 
-    write_xai_notes(out_dir, note_rows)
+    write_xai_notes(out_dir, note_rows, args.notes_name)
 
     print(f"Saved XAI plots to {out_dir}")
 
