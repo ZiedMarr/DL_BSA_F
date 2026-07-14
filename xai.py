@@ -145,8 +145,14 @@ def find_examples(model, dataset, device, class_idx, max_check):
 def qrs_peaks(lead_signal, fs):
     signal = np.abs(lead_signal - np.median(lead_signal))
     distance = int(0.25 * fs)
-    height = np.percentile(signal, 90)
-    peaks, _ = find_peaks(signal, distance=distance, height=height)
+    height = np.percentile(signal, 92)
+    prominence = max(np.std(signal), 0.1)
+    peaks, _ = find_peaks(signal, distance=distance, height=height, prominence=prominence)
+
+    if len(peaks) < 2:
+        height = np.percentile(signal, 88)
+        peaks, _ = find_peaks(signal, distance=distance, height=height)
+
     return peaks
 
 
@@ -167,11 +173,23 @@ def plot_xai(signal, heatmap, title, out_path, lead_idx, fs, show_qrs):
 
     if show_qrs:
         for peak in qrs_peaks(lead_signal, fs):
-            ax.axvline(peak, color="white", linestyle="--", linewidth=0.8, alpha=0.75)
+            ax.axvline(peak, color="red", linestyle="--", linewidth=1.3, alpha=0.9)
+        peaks = qrs_peaks(lead_signal, fs)
+        ax.scatter(
+            peaks,
+            lead_signal[peaks],
+            color="red",
+            marker="v",
+            s=35,
+            zorder=5,
+            label="QRS marker",
+        )
 
     ax.set_title(title)
     ax.set_xlabel("Samples")
     ax.set_ylabel(lead_name)
+    if show_qrs:
+        ax.legend(loc="upper right", fontsize=8)
     fig.tight_layout()
     fig.savefig(out_path, dpi=200)
     plt.close(fig)
