@@ -253,11 +253,12 @@ def run_experiment(config):
         else:
             criterion = nn.BCEWithLogitsLoss()
 
+        val_criterion = nn.BCEWithLogitsLoss()
         fold_history = []
 
         for epoch in range(config["training"]["epochs"]):
             loss = train_one_epoch(model, train_loader, optimizer, criterion, device)
-            metrics = evaluate(model, test_loader, device, criterion)
+            metrics = evaluate(model, test_loader, device, val_criterion)
 
             print(
                 f"Epoch {epoch + 1}: "
