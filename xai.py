@@ -62,9 +62,11 @@ class GradCam1D:
 
     def __call__(self, x, class_idx):
         self.model.zero_grad()
-        output = self.model(x)
-        score = output[0, class_idx]
-        score.backward()
+
+        with torch.backends.cudnn.flags(enabled=False):
+            output = self.model(x)
+            score = output[0, class_idx]
+            score.backward()
 
         # average gradients over time
         weights = self.gradients.mean(dim=2, keepdim=True)
