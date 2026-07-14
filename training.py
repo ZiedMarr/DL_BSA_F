@@ -58,7 +58,29 @@ def macro_auc(y_true, y_prob):
     return float(np.mean(aucs))
 
 
-def evaluate(model, loader, device, criterion=None):
+def tune_thresholds(y_true, y_prob):
+    thresholds = []
+    tuned_pred = np.zeros_like(y_prob, dtype=np.float32)
+
+    for class_idx in range(y_true.shape[1]):
+        best_threshold = 0.5
+        best_score = -1
+
+        for threshold in np.arange(0.1, 0.91, 0.05):
+            pred = (y_prob[:, class_idx] >= threshold).astype(np.float32)
+            score = f1_score(y_true[:, class_idx], pred, zero_division=0)
+
+            if score > best_score:
+                best_score = score
+                best_threshold = float(threshold)
+
+        thresholds.append(best_threshold)
+        tuned_pred[:, class_idx] = (y_prob[:, class_idx] >= best_threshold).astype(np.float32)
+
+    return thresholds, tuned_pred
+
+
+def evaluate(model, loader, device, criterion=None, threshold_tuning=False):
     model.eval()
     true_labels = []
     probabilities = []
@@ -84,6 +106,11 @@ def evaluate(model, loader, device, criterion=None):
     y_prob = np.concatenate(probabilities, axis=0)
     y_pred = (y_prob >= 0.5).astype(np.float32)
 
+    thresholds = [0.5] * y_true.shape[1]
+
+    if threshold_tuning:
+        thresholds, y_pred = tune_thresholds(y_true, y_prob)
+
     per_class_f1 = f1_score(y_true, y_pred, average=None, zero_division=0)
 
     metrics = {
@@ -91,6 +118,7 @@ def evaluate(model, loader, device, criterion=None):
         "micro_f1": float(f1_score(y_true, y_pred, average="micro", zero_division=0)),
         "macro_auc": macro_auc(y_true, y_prob),
         "per_class_f1": per_class_f1.tolist(),
+        "thresholds": thresholds,
     }
 
     if criterion is not None:
@@ -99,7 +127,7 @@ def evaluate(model, loader, device, criterion=None):
     return metrics
 
 
-def get_class_weights(dataset, device, num_classes):
+def get_class_weights(dataset, device, num_classes, mode="full"):
     label_counts = np.zeros(num_classes, dtype=np.float32)
 
     for item in dataset:
@@ -109,11 +137,18 @@ def get_class_weights(dataset, device, num_classes):
     neg_counts = total - label_counts
     weights = neg_counts / np.maximum(label_counts, 1)
 
+    if mode == "sqrt":
+        weights = np.sqrt(weights)
+
     return torch.tensor(weights, dtype=torch.float32).to(device)
 
 
 def result_name(config):
     name = config["model"]["name"]
+    experiment_name = config["training"].get("experiment_name")
+
+    if experiment_name:
+        return f"{name}_{experiment_name}"
 
     if config["training"].get("class_weights", False):
         return f"{name}_weighted"
@@ -241,6 +276,7 @@ def run_experiment(config):
         optimizer = torch.optim.Adam(
             model.parameters(),
             lr=config["training"]["learning_rate"],
+            weight_decay=config["training"].get("weight_decay", 0),
         )
 
         if config["training"].get("class_weights", False):
@@ -248,6 +284,7 @@ def run_experiment(config):
                 train_dataset,
                 device,
                 config["dataset"]["num_classes"],
+                mode=config["training"].get("class_weight_mode", "full"),
             )
             criterion = nn.BCEWithLogitsLoss(pos_weight=class_weights)
         else:
@@ -258,7 +295,13 @@ def run_experiment(config):
 
         for epoch in range(config["training"]["epochs"]):
             loss = train_one_epoch(model, train_loader, optimizer, criterion, device)
-            metrics = evaluate(model, test_loader, device, val_criterion)
+            metrics = evaluate(
+                model,
+                test_loader,
+                device,
+                val_criterion,
+                threshold_tuning=config["training"].get("threshold_tuning", False),
+            )
 
             print(
                 f"Epoch {epoch + 1}: "

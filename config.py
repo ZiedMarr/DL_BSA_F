@@ -41,7 +41,11 @@ def get_config():
             "epochs": 100,
             "learning_rate": 1e-3,
             "device": "cuda",  # change to "cpu" if needed
-            "class_weights": False
+            "class_weights": False,
+            "class_weight_mode": "full",
+            "weight_decay": 0,
+            "threshold_tuning": False,
+            "experiment_name": None
         },
 
         "evaluation": {

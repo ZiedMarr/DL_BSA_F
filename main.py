@@ -25,6 +25,35 @@ def parse_args():
         action="store_true",
         help="Use class-weighted BCE loss.",
     )
+    parser.add_argument(
+        "--class-weight-mode",
+        choices=["full", "sqrt"],
+        help="How strong the positive class weights should be.",
+    )
+    parser.add_argument(
+        "--weight-decay",
+        type=float,
+        help="Weight decay used by Adam.",
+    )
+    parser.add_argument(
+        "--learning-rate",
+        type=float,
+        help="Learning rate used by Adam.",
+    )
+    parser.add_argument(
+        "--threshold-tuning",
+        action="store_true",
+        help="Tune one decision threshold per class on the held-out fold.",
+    )
+    parser.add_argument(
+        "--protocol",
+        choices=["kfold", "group_kfold", "loso", "lmso"],
+        help="Evaluation protocol.",
+    )
+    parser.add_argument(
+        "--experiment-name",
+        help="Extra name used for saved results and checkpoints.",
+    )
     return parser.parse_args()
 
 
@@ -49,6 +78,24 @@ def main():
 
     if args.class_weights:
         config["training"]["class_weights"] = True
+
+    if args.class_weight_mode is not None:
+        config["training"]["class_weight_mode"] = args.class_weight_mode
+
+    if args.weight_decay is not None:
+        config["training"]["weight_decay"] = args.weight_decay
+
+    if args.learning_rate is not None:
+        config["training"]["learning_rate"] = args.learning_rate
+
+    if args.threshold_tuning:
+        config["training"]["threshold_tuning"] = True
+
+    if args.protocol is not None:
+        config["evaluation"]["protocol"] = args.protocol
+
+    if args.experiment_name is not None:
+        config["training"]["experiment_name"] = args.experiment_name
 
     create_folders(config)
 
