@@ -60,7 +60,7 @@ if __name__ == "__main__":
     subj["signals"] = preprocessing_pipeline(signal=subj["signals"])
     segments = segmentation(subject_dict=subj)
 
-    sample_signal = torch.tensor(segments[0]["signals"], dtype=torch.float32)  # (12, segment_length)
+    sample_signal = torch.tensor(segments[0]["signals"])  # (12, segment_length)
     transform = stft_transform(**STFT_PARAMS)
     out = transform(sample_signal)
     print(out.shape)  # (12, F, T)

@@ -182,16 +182,20 @@ class CNNStem(nn.Module):
 class CNNViT(nn.Module):
     def __init__(
         self,
-        in_channels=12,
+        config,
         input_shape=(65, 47),   # (F, T) from your STFT output — pass this in instead of num_tokens
         embed_dim=128,
         num_heads=4,
         depth=4,
         mlp_ratio=4.0,
-        num_classes=9,
         dropout=0.1,
     ):
         super().__init__()
+        
+        in_channels = config["dataset"]["input_channels"]
+        num_classes = config["dataset"]["num_classes"]
+
+
         self.stem = CNNStem(in_channels, embed_dim)
 
         # Dummy forward pass to infer num_tokens from actual (F, T)
@@ -240,5 +244,8 @@ def get_model(config):
 
     if model_name == "resnet":
         return ResNet1D(config)
+    
+    if model_name== "cnn_vit":
+        return CNNViT(config) 
 
     raise ValueError(f"Unknown model name: {model_name}")

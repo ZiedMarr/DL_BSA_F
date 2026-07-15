@@ -1,0 +1,26 @@
+{
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "CPython 3.14.3",
+  "startedAt": "2026-06-09T16:23:15.866337Z",
+  "program": "-m tests.test_wandb",
+  "git": {
+    "remote": "git@github.com:ZiedMarr/DL_BSA_F.git",
+    "commit": "d8c8ee511749d716d14c72f183d4656b043372f2"
+  },
+  "email": "zied.marrakchi2001@gmail.com",
+  "root": "C:\\Users\\ziedm\\Refernce File\\Studium\\SoSe 26\\DL BSA Project\\repo\\DL_BSA_F",
+  "host": "Zied-Thinkpad",
+  "executable": "C:\\Users\\ziedm\\Refernce File\\Studium\\SoSe 26\\DL BSA Project\\repo\\DL_BSA_F\\.venv\\Scripts\\python.exe",
+  "cpu_count": 16,
+  "cpu_count_logical": 22,
+  "disk": {
+    "/": {
+      "total": "1021821579264",
+      "used": "259897270272"
+    }
+  },
+  "memory": {
+    "total": "33799254016"
+  },
+  "writerId": "zmpa1iqp7cm2vmto0ufrr6jx5hdk2a9o"
+}
