@@ -190,6 +190,7 @@ class CNNViT(nn.Module):
         mlp_ratio=4.0,
         dropout=0.1,
     ):
+        # TODO: derive input_shape from STFT_PARAMS
         super().__init__()
         
         in_channels = config["dataset"]["input_channels"]
