@@ -32,7 +32,7 @@ def get_config():
         },
 
         "model": {
-            "name": "cnn1d"
+            "name": "cnn_vit"
         },
 
         "preprocess": {
@@ -45,14 +45,14 @@ def get_config():
 
         "training": {
             "batch_size": 32,
-            "epochs": 100,
+            "epochs": 1,
             "learning_rate": 1e-3,
             "device": "cpu"  # change to "cpu" if needed
         },
 
         "evaluation": {
             "protocol": "group_kfold",
-            "num_folds": 10
+            "num_folds": 2
         }
     }
 

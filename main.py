@@ -12,7 +12,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model",
-        choices=["cnn1d", "resnet"],
+        choices=["cnn1d", "resnet", "cnn_vit"],
         help="Model to train. If not set, config.py is used.",
     )
     parser.add_argument(
