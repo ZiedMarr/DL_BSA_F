@@ -47,7 +47,7 @@ def get_config():
             "batch_size": 32,
             "epochs": 1,
             "learning_rate": 1e-3,
-            "device": "cpu"  # change to "cpu" if needed
+            "device": "cuda"  # change to "cpu" if needed
         },
 
         "evaluation": {
