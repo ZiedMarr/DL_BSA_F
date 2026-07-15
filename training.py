@@ -12,8 +12,10 @@ from torch.utils.data import DataLoader, Subset
 import wandb
 
 
+from config import STFT_PARAMS
 from dataset import BiosignalDataset
 from models import get_model
+from transforms import stft_transform
 from utils import (
     check_no_leakage,
     get_subject_ids,
@@ -22,6 +24,15 @@ from utils import (
     lmso_split,
     loso_split,
 )
+
+SPECTRAL_MODELS = {"cnn_vit"}
+
+
+def make_transform(config):
+    if config["model"]["name"] in SPECTRAL_MODELS:
+        return stft_transform(**STFT_PARAMS)
+
+    return None
 
 
 def train_one_epoch(model, loader, optimizer, criterion, device):
@@ -142,6 +153,7 @@ def run_experiment(config):
     device = config["training"]["device"]
     protocol = config["evaluation"]["protocol"]
     splits = make_splits(config)
+    transform = make_transform(config)
     results = []
 
     for fold, split in enumerate(splits):
@@ -151,12 +163,12 @@ def run_experiment(config):
             train_sids, test_sids = split
             check_no_leakage(train_sids, test_sids)
 
-            train_dataset = BiosignalDataset(config, train_sids)
-            test_dataset = BiosignalDataset(config, test_sids)
+            train_dataset = BiosignalDataset(config, train_sids, transform=transform)
+            test_dataset = BiosignalDataset(config, test_sids, transform=transform)
 
         else:
             train_idx, test_idx = split
-            full_dataset = BiosignalDataset(config, subject_ids=None)
+            full_dataset = BiosignalDataset(config, subject_ids=None, transform=transform)
             train_dataset = Subset(full_dataset, train_idx)
             test_dataset = Subset(full_dataset, test_idx)
 
@@ -173,11 +185,16 @@ def run_experiment(config):
         )
 
         model = get_model(config).to(device)
-        dummy = torch.randn(
-            2,
+
+        dummy_signal = torch.randn(
             config["dataset"]["input_channels"],
             config["dataset"]["segment_length"],
-        ).to(device)
+        )
+
+        if transform is not None:
+            dummy = torch.stack([transform(dummy_signal) for _ in range(2)]).to(device)
+        else:
+            dummy = dummy_signal.unsqueeze(0).repeat(2, 1, 1).to(device)
 
         try:
             _ = model(dummy)

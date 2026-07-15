@@ -8,8 +8,9 @@ from torch.utils.data import Dataset
 
 
 class BiosignalDataset(Dataset):
-    def __init__(self, config, subject_ids=None):
+    def __init__(self, config, subject_ids=None, transform=None):
         self.data = []
+        self.transform = transform
 
         data_path = config["paths"]["processed_data"]
         expected_channels = config["dataset"]["input_channels"]
@@ -84,6 +85,8 @@ class BiosignalDataset(Dataset):
         item = self.data[idx]
 
         x = torch.tensor(item["signal"], dtype=torch.float32)
+        if self.transform is not None:
+            x = self.transform(x)
         y = torch.tensor(item["label"], dtype=torch.float32)
 
         return {

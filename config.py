@@ -1,5 +1,8 @@
 # config.py
 
+STFT_PARAMS = {"n_fft": 128, "hop_length": 32, "win_length": 128}
+
+
 def get_config():
     config = {
         "wandb": {
