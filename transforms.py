@@ -8,17 +8,15 @@ def stft_transform(n_fft, hop_length, win_length):
     eps = 1e-8
 
     def transform(signal):
-        magnitudes = [
-            torch.stft(
-                lead,
-                n_fft=n_fft,
-                hop_length=hop_length,
-                win_length=win_length,
-                window=window,
-                return_complex=True,
-            ).abs()
-            for lead in signal
-        ]
-        return torch.log(torch.stack(magnitudes, dim=0) + eps)
+        spec = torch.stft(
+            signal,
+            n_fft=n_fft,
+            hop_length=hop_length,
+            win_length=win_length,
+            window=window.to(signal.device, signal.dtype),
+            center=True,
+            return_complex=True,
+        )
+        return torch.log(spec.abs() + eps)
 
     return transform
