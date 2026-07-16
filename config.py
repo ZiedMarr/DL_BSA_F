@@ -6,7 +6,7 @@ STFT_PARAMS = {"n_fft": 64, "hop_length": 16, "win_length": 64}
 def get_config():
     config = {
         "wandb": {
-            "EXPERIMENT_NAME": "baseline_1" ,
+            "EXPERIMENT_NAME": "cnn_vit" ,
             "PROJECT_NAME": "ecg-classification"
         },
         "paths": {
@@ -45,14 +45,14 @@ def get_config():
 
         "training": {
             "batch_size": 32,
-            "epochs": 1,
+            "epochs": 100,
             "learning_rate": 1e-3,
             "device": "cuda"  # change to "cpu" if needed
         },
 
         "evaluation": {
             "protocol": "group_kfold",
-            "num_folds": 2
+            "num_folds": 10
         }
     }
 

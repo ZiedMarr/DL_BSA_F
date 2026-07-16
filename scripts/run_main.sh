@@ -7,4 +7,4 @@
 #SBATCH --output=logs/job-%j.out
 #SBATCH --chdir=/home/bsa01/DL_BSA_F
 
-apptainer run --nv /home/bsa01/containers/python_container.sif python -u main.py --model cnn1d --epochs 100
+apptainer run --nv ~/containers/bsa05_cont_3.sif python -u main.py --model cnn_vit --epochs 100
