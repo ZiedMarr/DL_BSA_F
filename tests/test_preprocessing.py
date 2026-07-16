@@ -6,6 +6,20 @@ from  matplotlib import pyplot as plt
 from config import get_config
 from transforms import stft_transform
 from config import STFT_PARAMS
+import numpy as np
+import torch
+import matplotlib.pyplot as plt
+
+from transforms import stft_transform
+
+FS = 250  # sampling rate AFTER downsampling in your preprocessing pipeline
+
+# Candidate configs to compare: (n_fft, hop_length, win_length)
+CONFIGS = [
+    (128, 32, 128),   # current default
+    (64, 16, 64),     # shorter window, literature-typical range
+    (32, 8, 32),      # very short window, finest time localization
+]
 
 cfg = get_config()
 sampling_rate = cfg["dataset"]["sampling_rate"]
@@ -48,6 +62,61 @@ def visualize_signal(signal, channel, preprocess=False):
     plt.xlabel("Time (s)")
     plt.show(block= False)
 
+"""
+Compare STFT parameter choices on an already-loaded ECG segment.
+
+Usage (e.g. from your test file, after loading a segment):
+
+    sample_signal = torch.tensor(segments[0]["signals"])  # (12, segment_length)
+    plot_stft_comparison(sample_signal, lead_idx=1)
+"""
+
+
+
+
+def plot_stft_comparison(sample_signal, lead_idx=1, fs=FS, configs=CONFIGS, save_path="./tests/data/stft_comparison.png"):
+    """
+    sample_signal: (12, T) tensor for one segment.
+    """
+    lead_signal = sample_signal[lead_idx]
+    t_axis = np.arange(len(lead_signal)) / fs
+
+    n_configs = len(configs)
+    fig, axes = plt.subplots(n_configs + 1, 1, figsize=(10, 3 * (n_configs + 1)))
+
+    axes[0].plot(t_axis, lead_signal.numpy(), linewidth=0.8)
+    axes[0].set_title(f"Raw lead {lead_idx} waveform")
+    axes[0].set_xlabel("Time (s)")
+    axes[0].set_ylabel("Amplitude")
+
+    for i, (n_fft, hop, win) in enumerate(configs, start=1):
+        transform = stft_transform(n_fft=n_fft, hop_length=hop, win_length=win)
+        spec = transform(sample_signal)  # (12, F, T)
+        spec_lead = spec[lead_idx].numpy()
+
+        freqs = np.linspace(0, fs / 2, spec_lead.shape[0])
+        times = np.linspace(0, len(lead_signal) / fs, spec_lead.shape[1])
+
+        win_ms = win / fs * 1000
+        hop_ms = hop / fs * 1000
+        df = fs / n_fft
+
+        ax = axes[i]
+        im = ax.pcolormesh(times, freqs, spec_lead, shading="auto", cmap="magma")
+        ax.set_ylim(0, 50)  # ECG-relevant band only
+        ax.set_title(
+            f"n_fft={n_fft}, hop={hop} ({hop_ms:.0f} ms), win={win} ({win_ms:.0f} ms), "
+            f"\u0394f={df:.1f} Hz, shape={spec_lead.shape}"
+        )
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel("Frequency (Hz)")
+        fig.colorbar(im, ax=ax, label="log-magnitude")
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150)
+    print(f"Saved comparison plot to {save_path}")
+    plt.show()
+
 if __name__ == "__main__":
     """
     subj = form_subject_dict(signals_path, ref_path, 1222)
@@ -61,7 +130,10 @@ if __name__ == "__main__":
     segments = segmentation(subject_dict=subj)
 
     sample_signal = torch.tensor(segments[0]["signals"])  # (12, segment_length)
+    plot_stft_comparison(sample_signal)
+    """
     transform = stft_transform(**STFT_PARAMS)
     out = transform(sample_signal)
     print(out.shape)  # (12, F, T)
+    """
 
