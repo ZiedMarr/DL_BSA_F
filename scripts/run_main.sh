@@ -5,6 +5,6 @@
 #SBATCH --gpus-per-node=1
 #SBATCH --ntasks-per-node=2
 #SBATCH --output=logs/job-%j.out
-#SBATCH --chdir=/home/bsa05/DL_BSA_F
+#SBATCH --chdir=/home/bsa05/repo/DL_BSA_F
 
 apptainer run --nv /home/bsa05/containers/bsa05_cont_3.sif python -u main.py --model cnn_vit --epochs 100
