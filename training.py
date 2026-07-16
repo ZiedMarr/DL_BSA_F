@@ -243,6 +243,7 @@ def run_experiment(config):
                 "history": fold_history,
             }
         )
+        save_results(results, config)
 
     final_f1 = [fold["final"]["macro_f1"] for fold in results]
     final_auc = [
