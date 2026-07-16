@@ -183,7 +183,7 @@ class CNNViT(nn.Module):
     def __init__(
         self,
         config,
-        input_shape=(65, 47),   # (F, T) from your STFT output — pass this in instead of num_tokens
+        input_shape=(33, 94),   # (F, T) from your STFT output — pass this in instead of num_tokens
         embed_dim=128,
         num_heads=4,
         depth=4,

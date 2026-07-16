@@ -3,6 +3,7 @@ import torch
 from config import get_config
 from models import get_model
 from transforms import stft_transform
+from config import STFT_PARAMS
 
 config = get_config()
 config["model"]["name"] = "cnn_vit"
@@ -13,7 +14,6 @@ model = get_model(config)
 model.eval()
 
 # Build the same transform training.py would use
-STFT_PARAMS = {"n_fft": 128, "hop_length": 32, "win_length": 128}
 transform = stft_transform(**STFT_PARAMS)
 
 # Fake a small batch of raw signals: (batch, 12, 1500)

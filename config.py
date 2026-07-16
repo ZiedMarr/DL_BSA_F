@@ -1,6 +1,6 @@
 # config.py
 
-STFT_PARAMS = {"n_fft": 128, "hop_length": 32, "win_length": 128}
+STFT_PARAMS = {"n_fft": 64, "hop_length": 16, "win_length": 64}
 
 
 def get_config():
