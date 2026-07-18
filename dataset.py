@@ -8,8 +8,10 @@ from torch.utils.data import Dataset
 
 
 class BiosignalDataset(Dataset):
-    def __init__(self, config, subject_ids=None):
+    def __init__(self, config, subject_ids=None, augment=False):
         self.data = []
+        self.augment = augment
+        self.aug_config = config["training"].get("augmentation", {})
 
         data_path = config["paths"]["processed_data"]
         expected_channels = config["dataset"]["input_channels"]
@@ -83,7 +85,12 @@ class BiosignalDataset(Dataset):
     def __getitem__(self, idx):
         item = self.data[idx]
 
-        x = torch.tensor(item["signal"], dtype=torch.float32)
+        signal = item["signal"].copy()
+
+        if self.augment:
+            signal = self.apply_augmentation(signal)
+
+        x = torch.tensor(signal, dtype=torch.float32)
         y = torch.tensor(item["label"], dtype=torch.float32)
 
         return {
@@ -94,3 +101,21 @@ class BiosignalDataset(Dataset):
 
     def get_all_subject_ids(self):
         return sorted({item["subject_id"] for item in self.data})
+
+    def apply_augmentation(self, signal):
+        noise_std = self.aug_config.get("noise_std", 0)
+        scale_range = self.aug_config.get("scale_range", 0)
+        shift_samples = self.aug_config.get("shift_samples", 0)
+
+        if scale_range > 0:
+            scale = np.random.uniform(1 - scale_range, 1 + scale_range)
+            signal = signal * scale
+
+        if noise_std > 0:
+            signal = signal + np.random.normal(0, noise_std, signal.shape).astype(np.float32)
+
+        if shift_samples > 0:
+            shift = np.random.randint(-shift_samples, shift_samples + 1)
+            signal = np.roll(signal, shift, axis=1)
+
+        return signal.astype(np.float32)

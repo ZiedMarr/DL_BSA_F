@@ -48,7 +48,13 @@ def get_config():
             "class_weight_mode": "full",
             "weight_decay": 0,
             "threshold_tuning": False,
-            "experiment_name": None
+            "experiment_name": None,
+            "use_augmentation": False,
+            "augmentation": {
+                "noise_std": 0.01,
+                "scale_range": 0.1,
+                "shift_samples": 25
+            }
         },
 
         "evaluation": {

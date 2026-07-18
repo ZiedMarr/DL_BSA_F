@@ -61,6 +61,11 @@ def parse_args():
         help="Tune one decision threshold per class on the held-out fold.",
     )
     parser.add_argument(
+        "--augment",
+        action="store_true",
+        help="Use simple training data augmentation.",
+    )
+    parser.add_argument(
         "--protocol",
         choices=["kfold", "group_kfold", "loso", "lmso"],
         help="Evaluation protocol.",
@@ -114,6 +119,9 @@ def main():
 
     if args.threshold_tuning:
         config["training"]["threshold_tuning"] = True
+
+    if args.augment:
+        config["training"]["use_augmentation"] = True
 
     if args.protocol is not None:
         config["evaluation"]["protocol"] = args.protocol

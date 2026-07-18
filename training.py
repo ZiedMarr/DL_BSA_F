@@ -279,7 +279,11 @@ def run_experiment(config):
             train_sids, test_sids = split
             check_no_leakage(train_sids, test_sids)
 
-            train_dataset = BiosignalDataset(config, train_sids)
+            train_dataset = BiosignalDataset(
+                config,
+                train_sids,
+                augment=config["training"].get("use_augmentation", False),
+            )
             test_dataset = BiosignalDataset(config, test_sids)
 
         else:
