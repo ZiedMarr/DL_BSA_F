@@ -51,7 +51,7 @@ class CNNBiGRUAttention(nn.Module):
         )
 
         self.attention = Attention(hidden_size=64)
-        self.dropout = nn.Dropout(0.4)
+        self.dropout = nn.Dropout(0.5)
         self.fc = nn.Linear(64, num_classes)
 
     def forward(self, x):
@@ -140,7 +140,7 @@ class ResNet1D(nn.Module):
         self.block4 = ResBlock(64, 64)
 
         self.pool = nn.AdaptiveAvgPool1d(1)
-        self.dropout = nn.Dropout(0.4)
+        self.dropout = nn.Dropout(0.5)
         self.fc = nn.Linear(64, num_classes)
 
     def forward(self, x):

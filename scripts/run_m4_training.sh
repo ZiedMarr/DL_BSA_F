@@ -7,5 +7,5 @@
 #SBATCH --output=logs/m4-%j.out
 #SBATCH --chdir=/home/bsa01/DL_BSA_F
 
-apptainer run --nv /home/bsa01/containers/python_container.sif python -u main.py --model cnn1d --epochs 200 --class-weights --class-weight-mode sqrt --learning-rate 1e-4 --weight-decay 1e-4 --optimizer adamw --scheduler warmup_cosine --warmup-epochs 5 --experiment-name m4
-apptainer run --nv /home/bsa01/containers/python_container.sif python -u main.py --model resnet --epochs 200 --class-weights --class-weight-mode sqrt --learning-rate 1e-4 --weight-decay 1e-4 --optimizer adamw --scheduler warmup_cosine --warmup-epochs 5 --experiment-name m4
+apptainer run --nv /home/bsa01/containers/python_container.sif python -u main.py --model cnn1d --epochs 200 --class-weights --class-weight-mode sqrt --learning-rate 5e-5 --weight-decay 5e-4 --optimizer adamw --scheduler warmup_cosine --warmup-epochs 5 --experiment-name m4
+apptainer run --nv /home/bsa01/containers/python_container.sif python -u main.py --model resnet --epochs 200 --class-weights --class-weight-mode sqrt --learning-rate 5e-5 --weight-decay 5e-4 --optimizer adamw --scheduler warmup_cosine --warmup-epochs 5 --experiment-name m4
