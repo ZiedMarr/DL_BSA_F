@@ -82,6 +82,31 @@ def tune_thresholds(y_true, y_prob):
     return thresholds, tuned_pred
 
 
+def multilabel_confusion_counts(y_true, y_pred):
+    counts = []
+
+    for class_idx in range(y_true.shape[1]):
+        true_class = y_true[:, class_idx]
+        pred_class = y_pred[:, class_idx]
+
+        tp = int(np.sum((true_class == 1) & (pred_class == 1)))
+        fp = int(np.sum((true_class == 0) & (pred_class == 1)))
+        fn = int(np.sum((true_class == 1) & (pred_class == 0)))
+        tn = int(np.sum((true_class == 0) & (pred_class == 0)))
+
+        counts.append(
+            {
+                "class": class_idx + 1,
+                "tn": tn,
+                "fp": fp,
+                "fn": fn,
+                "tp": tp,
+            }
+        )
+
+    return counts
+
+
 def evaluate(model, loader, device, criterion=None, threshold_tuning=False):
     model.eval()
     true_labels = []
@@ -120,6 +145,7 @@ def evaluate(model, loader, device, criterion=None, threshold_tuning=False):
         "micro_f1": float(f1_score(y_true, y_pred, average="micro", zero_division=0)),
         "macro_auc": macro_auc(y_true, y_prob),
         "per_class_f1": per_class_f1.tolist(),
+        "confusion": multilabel_confusion_counts(y_true, y_pred),
         "thresholds": thresholds,
     }
 
@@ -243,6 +269,25 @@ def save_results(results, config):
                     float(np.std(values)),
                 ]
             )
+
+        writer.writerow([])
+        writer.writerow(["class", "tn", "fp", "fn", "tp"])
+
+        confusion_totals = {}
+
+        for fold_result in results:
+            for item in fold_result["final"].get("confusion", []):
+                class_idx = item["class"]
+
+                if class_idx not in confusion_totals:
+                    confusion_totals[class_idx] = {"tn": 0, "fp": 0, "fn": 0, "tp": 0}
+
+                for key in ["tn", "fp", "fn", "tp"]:
+                    confusion_totals[class_idx][key] += item[key]
+
+        for class_idx in sorted(confusion_totals):
+            item = confusion_totals[class_idx]
+            writer.writerow([class_idx, item["tn"], item["fp"], item["fn"], item["tp"]])
 
 
 def make_splits(config):
