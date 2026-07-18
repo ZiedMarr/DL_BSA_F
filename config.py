@@ -49,6 +49,8 @@ def get_config():
             "weight_decay": 0,
             "threshold_tuning": False,
             "experiment_name": None,
+            "early_stopping": False,
+            "patience": 15,
             "use_augmentation": False,
             "augmentation": {
                 "noise_std": 0.01,

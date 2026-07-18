@@ -66,6 +66,16 @@ def parse_args():
         help="Use simple training data augmentation.",
     )
     parser.add_argument(
+        "--early-stopping",
+        action="store_true",
+        help="Stop training when validation loss stops improving.",
+    )
+    parser.add_argument(
+        "--patience",
+        type=int,
+        help="Patience used for early stopping.",
+    )
+    parser.add_argument(
         "--protocol",
         choices=["kfold", "group_kfold", "loso", "lmso"],
         help="Evaluation protocol.",
@@ -122,6 +132,12 @@ def main():
 
     if args.augment:
         config["training"]["use_augmentation"] = True
+
+    if args.early_stopping:
+        config["training"]["early_stopping"] = True
+
+    if args.patience is not None:
+        config["training"]["patience"] = args.patience
 
     if args.protocol is not None:
         config["evaluation"]["protocol"] = args.protocol

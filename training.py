@@ -1,6 +1,7 @@
 # training.py
 
 import csv
+import copy
 import json
 import math
 import os
@@ -331,6 +332,12 @@ def run_experiment(config):
 
         val_criterion = nn.BCEWithLogitsLoss()
         fold_history = []
+        best_loss = None
+        best_state = None
+        best_result = None
+        no_improve = 0
+        use_early_stopping = config["training"].get("early_stopping", False)
+        patience = config["training"].get("patience", 15)
 
         for epoch in range(config["training"]["epochs"]):
             lr = set_learning_rate(optimizer, config, epoch + 1)
@@ -360,6 +367,27 @@ def run_experiment(config):
                 }
             )
 
+            if use_early_stopping:
+                val_loss = metrics["val_loss"]
+
+                if best_loss is None or val_loss < best_loss:
+                    best_loss = val_loss
+                    best_state = copy.deepcopy(model.state_dict())
+                    best_result = fold_history[-1]
+                    no_improve = 0
+                else:
+                    no_improve += 1
+
+                if no_improve >= patience:
+                    print(f"Early stopping at epoch {epoch + 1}")
+                    break
+
+        if use_early_stopping and best_state is not None:
+            model.load_state_dict(best_state)
+            final_result = best_result
+        else:
+            final_result = fold_history[-1]
+
         torch.save(
             model.state_dict(),
             os.path.join(
@@ -371,7 +399,8 @@ def run_experiment(config):
         results.append(
             {
                 "fold": fold + 1,
-                "final": fold_history[-1],
+                "final": final_result,
+                "stopped_epoch": fold_history[-1]["epoch"],
                 "history": fold_history,
             }
         )
