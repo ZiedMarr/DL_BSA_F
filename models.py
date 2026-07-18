@@ -23,36 +23,36 @@ class CNNBiGRUAttention(nn.Module):
         in_channels = config["dataset"]["input_channels"]
         num_classes = config["dataset"]["num_classes"]
 
-        self.conv1 = nn.Conv1d(in_channels, 32, kernel_size=7, padding=3)
-        self.bn1 = nn.BatchNorm1d(32)
+        self.conv1 = nn.Conv1d(in_channels, 16, kernel_size=7, padding=3)
+        self.bn1 = nn.BatchNorm1d(16)
         self.pool1 = nn.MaxPool1d(kernel_size=2)
 
-        self.conv2 = nn.Conv1d(32, 64, kernel_size=7, padding=3)
-        self.bn2 = nn.BatchNorm1d(64)
+        self.conv2 = nn.Conv1d(16, 32, kernel_size=7, padding=3)
+        self.bn2 = nn.BatchNorm1d(32)
         self.pool2 = nn.MaxPool1d(kernel_size=2)
 
-        self.conv3 = nn.Conv1d(64, 64, kernel_size=7, padding=3)
-        self.bn3 = nn.BatchNorm1d(64)
+        self.conv3 = nn.Conv1d(32, 32, kernel_size=7, padding=3)
+        self.bn3 = nn.BatchNorm1d(32)
 
-        self.conv4 = nn.Conv1d(64, 128, kernel_size=7, padding=3)
-        self.bn4 = nn.BatchNorm1d(128)
+        self.conv4 = nn.Conv1d(32, 64, kernel_size=7, padding=3)
+        self.bn4 = nn.BatchNorm1d(64)
         self.pool4 = nn.MaxPool1d(kernel_size=2)
 
-        self.conv5 = nn.Conv1d(128, 128, kernel_size=7, padding=3)
-        self.bn5 = nn.BatchNorm1d(128)
+        self.conv5 = nn.Conv1d(64, 64, kernel_size=7, padding=3)
+        self.bn5 = nn.BatchNorm1d(64)
 
         self.relu = nn.ReLU()
 
         self.bigru = nn.GRU(
-            input_size=128,
-            hidden_size=64,
+            input_size=64,
+            hidden_size=32,
             batch_first=True,
             bidirectional=True,
         )
 
-        self.attention = Attention(hidden_size=128)
-        self.dropout = nn.Dropout(0.3)
-        self.fc = nn.Linear(128, num_classes)
+        self.attention = Attention(hidden_size=64)
+        self.dropout = nn.Dropout(0.4)
+        self.fc = nn.Linear(64, num_classes)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -130,18 +130,18 @@ class ResNet1D(nn.Module):
         in_channels = config["dataset"]["input_channels"]
         num_classes = config["dataset"]["num_classes"]
 
-        self.conv1 = nn.Conv1d(in_channels, 32, kernel_size=7, padding=3)
-        self.bn1 = nn.BatchNorm1d(32)
+        self.conv1 = nn.Conv1d(in_channels, 16, kernel_size=7, padding=3)
+        self.bn1 = nn.BatchNorm1d(16)
         self.relu = nn.ReLU()
 
-        self.block1 = ResBlock(32, 32)
-        self.block2 = ResBlock(32, 64, stride=2)
-        self.block3 = ResBlock(64, 128, stride=2)
-        self.block4 = ResBlock(128, 128)
+        self.block1 = ResBlock(16, 16)
+        self.block2 = ResBlock(16, 32, stride=2)
+        self.block3 = ResBlock(32, 64, stride=2)
+        self.block4 = ResBlock(64, 64)
 
         self.pool = nn.AdaptiveAvgPool1d(1)
-        self.dropout = nn.Dropout(0.3)
-        self.fc = nn.Linear(128, num_classes)
+        self.dropout = nn.Dropout(0.4)
+        self.fc = nn.Linear(64, num_classes)
 
     def forward(self, x):
         x = self.conv1(x)
