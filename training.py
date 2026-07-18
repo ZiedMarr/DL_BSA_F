@@ -2,6 +2,7 @@
 
 import csv
 import json
+import math
 import os
 
 import numpy as np
@@ -143,6 +144,44 @@ def get_class_weights(dataset, device, num_classes, mode="full"):
     return torch.tensor(weights, dtype=torch.float32).to(device)
 
 
+def make_optimizer(model, config):
+    name = config["training"].get("optimizer", "adam")
+    lr = config["training"]["learning_rate"]
+    weight_decay = config["training"].get("weight_decay", 0)
+
+    if name == "adamw":
+        return torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+    return torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+
+def set_learning_rate(optimizer, config, epoch):
+    scheduler = config["training"].get("scheduler", "none")
+
+    if scheduler != "warmup_cosine":
+        return optimizer.param_groups[0]["lr"]
+
+    base_lr = config["training"]["learning_rate"]
+    total_epochs = config["training"]["epochs"]
+    warmup_epochs = config["training"].get("warmup_epochs", 0)
+
+    if warmup_epochs > 0 and epoch <= warmup_epochs:
+        lr = base_lr * epoch / warmup_epochs
+    else:
+        if total_epochs == warmup_epochs:
+            progress = 1
+        else:
+            progress = (epoch - warmup_epochs) / (total_epochs - warmup_epochs)
+
+        progress = min(max(progress, 0), 1)
+        lr = base_lr * 0.5 * (1 + math.cos(math.pi * progress))
+
+    for group in optimizer.param_groups:
+        group["lr"] = lr
+
+    return lr
+
+
 def result_name(config):
     name = config["model"]["name"]
     experiment_name = config["training"].get("experiment_name")
@@ -273,11 +312,7 @@ def run_experiment(config):
         except Exception as exc:
             raise RuntimeError(f"Model forward failed: {exc}") from exc
 
-        optimizer = torch.optim.Adam(
-            model.parameters(),
-            lr=config["training"]["learning_rate"],
-            weight_decay=config["training"].get("weight_decay", 0),
-        )
+        optimizer = make_optimizer(model, config)
 
         if config["training"].get("class_weights", False):
             class_weights = get_class_weights(
@@ -294,6 +329,7 @@ def run_experiment(config):
         fold_history = []
 
         for epoch in range(config["training"]["epochs"]):
+            lr = set_learning_rate(optimizer, config, epoch + 1)
             loss = train_one_epoch(model, train_loader, optimizer, criterion, device)
             metrics = evaluate(
                 model,
@@ -314,6 +350,7 @@ def run_experiment(config):
             fold_history.append(
                 {
                     "epoch": epoch + 1,
+                    "learning_rate": float(lr),
                     "loss": float(loss),
                     **metrics,
                 }

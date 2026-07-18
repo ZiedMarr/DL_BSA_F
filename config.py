@@ -40,6 +40,9 @@ def get_config():
             "batch_size": 32,
             "epochs": 100,
             "learning_rate": 1e-3,
+            "optimizer": "adam",
+            "scheduler": "none",
+            "warmup_epochs": 0,
             "device": "cuda",  # change to "cpu" if needed
             "class_weights": False,
             "class_weight_mode": "full",

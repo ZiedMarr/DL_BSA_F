@@ -41,6 +41,21 @@ def parse_args():
         help="Learning rate used by Adam.",
     )
     parser.add_argument(
+        "--optimizer",
+        choices=["adam", "adamw"],
+        help="Optimizer used for training.",
+    )
+    parser.add_argument(
+        "--scheduler",
+        choices=["none", "warmup_cosine"],
+        help="Learning rate scheduler.",
+    )
+    parser.add_argument(
+        "--warmup-epochs",
+        type=int,
+        help="Number of warmup epochs.",
+    )
+    parser.add_argument(
         "--threshold-tuning",
         action="store_true",
         help="Tune one decision threshold per class on the held-out fold.",
@@ -87,6 +102,15 @@ def main():
 
     if args.learning_rate is not None:
         config["training"]["learning_rate"] = args.learning_rate
+
+    if args.optimizer is not None:
+        config["training"]["optimizer"] = args.optimizer
+
+    if args.scheduler is not None:
+        config["training"]["scheduler"] = args.scheduler
+
+    if args.warmup_epochs is not None:
+        config["training"]["warmup_epochs"] = args.warmup_epochs
 
     if args.threshold_tuning:
         config["training"]["threshold_tuning"] = True
