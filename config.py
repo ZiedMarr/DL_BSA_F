@@ -50,7 +50,9 @@ def get_config():
             "threshold_tuning": False,
             "experiment_name": None,
             "early_stopping": False,
+            "early_stopping_metric": "val_loss",
             "patience": 15,
+            "recording_eval": False,
             "use_augmentation": False,
             "augmentation": {
                 "noise_std": 0.01,

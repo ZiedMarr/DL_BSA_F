@@ -71,9 +71,19 @@ def parse_args():
         help="Stop training when validation loss stops improving.",
     )
     parser.add_argument(
+        "--early-stopping-metric",
+        choices=["val_loss", "recording_val_loss"],
+        help="Metric used for early stopping.",
+    )
+    parser.add_argument(
         "--patience",
         type=int,
         help="Patience used for early stopping.",
+    )
+    parser.add_argument(
+        "--recording-eval",
+        action="store_true",
+        help="Average segment predictions per recording during evaluation.",
     )
     parser.add_argument(
         "--protocol",
@@ -136,8 +146,14 @@ def main():
     if args.early_stopping:
         config["training"]["early_stopping"] = True
 
+    if args.early_stopping_metric is not None:
+        config["training"]["early_stopping_metric"] = args.early_stopping_metric
+
     if args.patience is not None:
         config["training"]["patience"] = args.patience
+
+    if args.recording_eval:
+        config["training"]["recording_eval"] = True
 
     if args.protocol is not None:
         config["evaluation"]["protocol"] = args.protocol

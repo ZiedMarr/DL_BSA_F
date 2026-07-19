@@ -9,6 +9,7 @@ import os
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from sklearn.metrics import f1_score, roc_auc_score
 from torch.utils.data import DataLoader, Subset
 
@@ -107,10 +108,46 @@ def multilabel_confusion_counts(y_true, y_pred):
     return counts
 
 
-def evaluate(model, loader, device, criterion=None, threshold_tuning=False):
+def recording_metrics(subject_ids, y_true, y_prob):
+    grouped = {}
+
+    for idx, subject_id in enumerate(subject_ids):
+        if subject_id not in grouped:
+            grouped[subject_id] = {"labels": y_true[idx], "probs": []}
+
+        grouped[subject_id]["probs"].append(y_prob[idx])
+
+    rec_true = []
+    rec_prob = []
+
+    for item in grouped.values():
+        rec_true.append(item["labels"])
+        rec_prob.append(np.mean(item["probs"], axis=0))
+
+    rec_true = np.asarray(rec_true, dtype=np.float32)
+    rec_prob = np.asarray(rec_prob, dtype=np.float32)
+    rec_pred = (rec_prob >= 0.5).astype(np.float32)
+
+    rec_prob_for_loss = np.clip(rec_prob, 1e-7, 1 - 1e-7)
+    loss = F.binary_cross_entropy(
+        torch.tensor(rec_prob_for_loss, dtype=torch.float32),
+        torch.tensor(rec_true, dtype=torch.float32),
+    )
+
+    return {
+        "recording_val_loss": float(loss.item()),
+        "recording_macro_f1": float(f1_score(rec_true, rec_pred, average="macro", zero_division=0)),
+        "recording_micro_f1": float(f1_score(rec_true, rec_pred, average="micro", zero_division=0)),
+        "recording_macro_auc": macro_auc(rec_true, rec_prob),
+        "recording_confusion": multilabel_confusion_counts(rec_true, rec_pred),
+    }
+
+
+def evaluate(model, loader, device, criterion=None, threshold_tuning=False, recording_eval=False):
     model.eval()
     true_labels = []
     probabilities = []
+    subject_ids = []
     total_loss = 0
 
     with torch.no_grad():
@@ -128,6 +165,7 @@ def evaluate(model, loader, device, criterion=None, threshold_tuning=False):
 
             true_labels.append(y.cpu().numpy())
             probabilities.append(probs.numpy())
+            subject_ids.extend(batch["subject_id"])
 
     y_true = np.concatenate(true_labels, axis=0)
     y_prob = np.concatenate(probabilities, axis=0)
@@ -151,6 +189,9 @@ def evaluate(model, loader, device, criterion=None, threshold_tuning=False):
 
     if criterion is not None:
         metrics["val_loss"] = float(total_loss / len(loader))
+
+    if recording_eval:
+        metrics.update(recording_metrics(subject_ids, y_true, y_prob))
 
     return metrics
 
@@ -227,14 +268,37 @@ def save_results(results, config):
     model_name = result_name(config)
     json_path = os.path.join(results_path, f"{model_name}_results.json")
     csv_path = os.path.join(results_path, f"{model_name}_summary.csv")
-    metrics = ["loss", "val_loss", "macro_f1", "micro_f1", "macro_auc"]
+    metrics = [
+        "loss",
+        "val_loss",
+        "recording_val_loss",
+        "macro_f1",
+        "micro_f1",
+        "macro_auc",
+        "recording_macro_f1",
+        "recording_micro_f1",
+        "recording_macro_auc",
+    ]
 
     with open(json_path, "w") as f:
         json.dump({"results": results}, f, indent=4)
 
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["fold", "loss", "val_loss", "macro_f1", "micro_f1", "macro_auc"])
+        writer.writerow(
+            [
+                "fold",
+                "loss",
+                "val_loss",
+                "recording_val_loss",
+                "macro_f1",
+                "micro_f1",
+                "macro_auc",
+                "recording_macro_f1",
+                "recording_micro_f1",
+                "recording_macro_auc",
+            ]
+        )
 
         for fold_result in results:
             final = fold_result["final"]
@@ -243,9 +307,13 @@ def save_results(results, config):
                     fold_result["fold"],
                     final["loss"],
                     final.get("val_loss"),
+                    final.get("recording_val_loss"),
                     final["macro_f1"],
                     final["micro_f1"],
                     final["macro_auc"],
+                    final.get("recording_macro_f1"),
+                    final.get("recording_micro_f1"),
+                    final.get("recording_macro_auc"),
                 ]
             )
 
@@ -276,7 +344,9 @@ def save_results(results, config):
         confusion_totals = {}
 
         for fold_result in results:
-            for item in fold_result["final"].get("confusion", []):
+            confusion_key = "recording_confusion" if config["training"].get("recording_eval", False) else "confusion"
+
+            for item in fold_result["final"].get(confusion_key, []):
                 class_idx = item["class"]
 
                 if class_idx not in confusion_totals:
@@ -382,6 +452,7 @@ def run_experiment(config):
         best_result = None
         no_improve = 0
         use_early_stopping = config["training"].get("early_stopping", False)
+        early_stopping_metric = config["training"].get("early_stopping_metric", "val_loss")
         patience = config["training"].get("patience", 15)
 
         for epoch in range(config["training"]["epochs"]):
@@ -393,6 +464,7 @@ def run_experiment(config):
                 device,
                 val_criterion,
                 threshold_tuning=config["training"].get("threshold_tuning", False),
+                recording_eval=config["training"].get("recording_eval", False),
             )
 
             print(
@@ -402,6 +474,14 @@ def run_experiment(config):
                 f"Macro-F1={metrics['macro_f1']:.4f}, "
                 f"Macro-AUC={metrics['macro_auc']}"
             )
+
+            if config["training"].get("recording_eval", False):
+                print(
+                    f"Recording: "
+                    f"Val-Loss={metrics['recording_val_loss']:.4f}, "
+                    f"Macro-F1={metrics['recording_macro_f1']:.4f}, "
+                    f"Macro-AUC={metrics['recording_macro_auc']}"
+                )
 
             fold_history.append(
                 {
@@ -413,7 +493,7 @@ def run_experiment(config):
             )
 
             if use_early_stopping:
-                val_loss = metrics["val_loss"]
+                val_loss = metrics[early_stopping_metric]
 
                 if best_loss is None or val_loss < best_loss:
                     best_loss = val_loss
