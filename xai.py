@@ -29,6 +29,7 @@ def parse_args():
     parser.add_argument("--leads", default=None)
     parser.add_argument("--max-check", type=int, default=4000)
     parser.add_argument("--qrs", action="store_true")
+    parser.add_argument("--gradcam-only", action="store_true")
     parser.add_argument("--notes-name", default="xai_clinical_notes.csv")
     return parser.parse_args()
 
@@ -195,7 +196,7 @@ def plot_xai(signal, heatmap, title, out_path, lead_idx, fs, show_qrs):
     plt.close(fig)
 
 
-def explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, tag, fs, show_qrs):
+def explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, tag, fs, show_qrs, gradcam_only=False):
     signal = item["signal"].numpy()
     x = item["signal"].unsqueeze(0).to(next(model.parameters()).device)
     lead_name = LEAD_NAMES[lead_idx] if lead_idx < len(LEAD_NAMES) else f"lead{lead_idx + 1}"
@@ -217,7 +218,7 @@ def explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx
         show_qrs,
     )
 
-    if model_name == "cnn1d":
+    if model_name == "cnn1d" and not gradcam_only:
         attn = attention_map(model, x)
         plot_xai(
             signal,
@@ -255,7 +256,7 @@ def write_xai_notes(out_dir, rows, notes_name):
             writer.writerow(row)
 
 
-def run_for_class(model, model_name, save_name, dataset, device, class_idx, lead_idx, out_dir, max_check, fs, show_qrs):
+def run_for_class(model, model_name, save_name, dataset, device, class_idx, lead_idx, out_dir, max_check, fs, show_qrs, gradcam_only=False):
     rows = []
     correct, wrong = find_examples(model, dataset, device, class_idx, max_check)
     class_name = f"class{class_idx + 1}"
@@ -265,10 +266,10 @@ def run_for_class(model, model_name, save_name, dataset, device, class_idx, lead
     if correct is not None:
         idx, item, prob = correct
         print(f"{class_name} correct example: sample {idx}, {lead_name}")
-        explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, "correct", fs, show_qrs)
+        explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, "correct", fs, show_qrs, gradcam_only)
 
         files = [f"{save_name}_{class_name}_correct_{lead_tag}_gradcam.png"]
-        if model_name == "cnn1d":
+        if model_name == "cnn1d" and not gradcam_only:
             files.append(f"{save_name}_{class_name}_correct_{lead_tag}_attention.png")
 
         rows.append([save_name, class_idx + 1, "correct", lead_name, idx, prob[class_idx], "; ".join(files), ""])
@@ -278,10 +279,10 @@ def run_for_class(model, model_name, save_name, dataset, device, class_idx, lead
     if wrong is not None:
         idx, item, prob = wrong
         print(f"{class_name} wrong example: sample {idx}, {lead_name}")
-        explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, "wrong", fs, show_qrs)
+        explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, "wrong", fs, show_qrs, gradcam_only)
 
         files = [f"{save_name}_{class_name}_wrong_{lead_tag}_gradcam.png"]
-        if model_name == "cnn1d":
+        if model_name == "cnn1d" and not gradcam_only:
             files.append(f"{save_name}_{class_name}_wrong_{lead_tag}_attention.png")
 
         rows.append([save_name, class_idx + 1, "wrong", lead_name, idx, prob[class_idx], "; ".join(files), ""])
@@ -344,6 +345,7 @@ def main():
                     args.max_check,
                     fs,
                     args.qrs,
+                    args.gradcam_only,
                 )
             )
 
