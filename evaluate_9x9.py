@@ -16,6 +16,10 @@ from training import evaluate, make_splits
 
 
 CLASS_NAMES = ["Normal", "AF", "I-AVB", "LBBB", "RBBB", "PAC", "PVC", "STD", "STE"]
+MODEL_TITLES = {
+    "cnn1d": "CNN-BiGRU-Attention",
+    "resnet": "ResNet",
+}
 
 
 def parse_args():
@@ -42,10 +46,16 @@ def save_matrix_csv(matrix, out_path):
 
 
 def save_matrix_plot(matrix, title, out_path):
-    max_value = int(np.max(matrix))
+    row_sums = matrix.sum(axis=1, keepdims=True)
+    norm_matrix = np.divide(
+        matrix,
+        row_sums,
+        out=np.zeros_like(matrix, dtype=float),
+        where=row_sums != 0,
+    )
 
     fig, ax = plt.subplots(figsize=(8, 7))
-    image = ax.imshow(matrix, cmap="Blues")
+    image = ax.imshow(norm_matrix, cmap="Blues", vmin=0, vmax=1)
     fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
 
     ax.set_title(title)
@@ -58,9 +68,9 @@ def save_matrix_plot(matrix, title, out_path):
 
     for row_idx in range(matrix.shape[0]):
         for col_idx in range(matrix.shape[1]):
-            value = int(matrix[row_idx, col_idx])
-            color = "white" if max_value > 0 and value > max_value * 0.55 else "black"
-            ax.text(col_idx, row_idx, str(value), ha="center", va="center", color=color, fontsize=9)
+            value = norm_matrix[row_idx, col_idx]
+            color = "white" if value > 0.55 else "black"
+            ax.text(col_idx, row_idx, f"{value:.2f}", ha="center", va="center", color=color, fontsize=8)
 
     fig.tight_layout()
     fig.savefig(out_path, dpi=300)
@@ -132,7 +142,8 @@ def main():
         png_path = os.path.join(config["paths"]["plots"], f"{base_name}.png")
 
         save_matrix_csv(matrix, csv_path)
-        save_matrix_plot(matrix, f"{model_name} 9x9 Class Matrix", png_path)
+        title = f"{MODEL_TITLES.get(model_name, model_name)} 9x9 Confusion Matrix"
+        save_matrix_plot(matrix, title, png_path)
 
         print(f"Saved {csv_path}")
         print(f"Saved {png_path}")

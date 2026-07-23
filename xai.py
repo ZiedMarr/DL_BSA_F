@@ -295,7 +295,7 @@ def run_attention_summary(model, save_name, dataset, device, class_list, out_dir
 
     plot_attention_summary(
         curves,
-        f"{save_name} Attention Weights Across Classes",
+        "Attention Weights Across Classes",
         os.path.join(out_dir, f"{save_name}_all_classes_attention_values.png"),
     )
     save_attention_summary_csv(

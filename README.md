@@ -105,19 +105,35 @@ This uses residual blocks instead of the recurrent layer.
 
 The model output is raw logits. Sigmoid is applied later during evaluation, because the loss function is `BCEWithLogitsLoss`.
 
-## Training
+## Final Training Setup
 
-Current training setup:
+The final experiments use this setup:
 
 ```text
 epochs: 100
 batch size: 32
-loss: BCEWithLogitsLoss
+loss: BCEWithLogitsLoss with sqrt class weights
+optimizer: AdamW
+learning rate: 5e-5
+weight decay: 5e-4
+scheduler: warmup cosine
+warmup epochs: 5
 evaluation: 10-fold Group K-Fold
+final evaluation: recording-level evaluation
 metrics: macro F1, micro F1, macro AUC, per-class F1
 ```
 
 Group K-Fold is used because each ECG recording is split into several segments. Segments from the same ECG should not appear in both training and testing.
+
+Recording-level evaluation is used for the final result. Segment probabilities from the same original ECG recording are averaged first, then the metrics are calculated.
+
+The final run also uses simple training augmentation:
+
+```text
+amplitude scaling
+small Gaussian noise
+small time shift
+```
 
 ## How To Run
 
@@ -149,6 +165,26 @@ python main.py --model resnet --epochs 100
 
 If processed `.npy` files already exist, preprocessing is skipped and training starts directly.
 
+To reproduce the final training setup from the command line:
+
+```bash
+python main.py --model cnn1d --epochs 100 --class-weights --class-weight-mode sqrt --learning-rate 5e-5 --weight-decay 5e-4 --optimizer adamw --scheduler warmup_cosine --warmup-epochs 5 --augment --recording-eval --early-stopping --early-stopping-metric recording_val_loss --patience 15 --experiment-name recording_eval
+
+python main.py --model resnet --epochs 100 --class-weights --class-weight-mode sqrt --learning-rate 5e-5 --weight-decay 5e-4 --optimizer adamw --scheduler warmup_cosine --warmup-epochs 5 --augment --recording-eval --early-stopping --early-stopping-metric recording_val_loss --patience 15 --experiment-name recording_eval
+```
+
+On the Hydra cluster, the same final training can be submitted with:
+
+```bash
+sbatch scripts/run_m4_training.sh
+```
+
+After training, run the attention summary and 9x9 class matrix script:
+
+```bash
+sbatch scripts/run_attention_and_9x9.sh
+```
+
 ## Outputs
 
 Trained model weights are saved in:
@@ -166,8 +202,25 @@ outputs/results/
 For example, when training `cnn1d`, the result files are:
 
 ```text
-cnn1d_results.json
-cnn1d_summary.csv
+cnn1d_recording_eval_results.json
+cnn1d_recording_eval_summary.csv
 ```
 
 The JSON file keeps the full fold and epoch history. The CSV file is a simpler summary that can be opened in Excel.
+
+The 9x9 class matrices are saved as:
+
+```text
+outputs/results/cnn1d_recording_eval_9x9_class_matrix.csv
+outputs/results/resnet_recording_eval_9x9_class_matrix.csv
+outputs/plots/cnn1d_recording_eval_9x9_class_matrix.png
+outputs/plots/resnet_recording_eval_9x9_class_matrix.png
+```
+
+The attention weight summary for the CNN-BiGRU-Attention model is saved in:
+
+```text
+outputs/xai/cnn1d_recording_eval_attention_all_classes_attention_values.csv
+outputs/xai/cnn1d_recording_eval_attention_all_classes_attention_values.png
+outputs/xai/cnn1d_recording_eval_attention_all_classes_heatmap.png
+```
