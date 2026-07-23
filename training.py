@@ -108,6 +108,21 @@ def multilabel_confusion_counts(y_true, y_pred):
     return counts
 
 
+def class_pair_matrix(y_true, y_pred):
+    num_classes = y_true.shape[1]
+    matrix = np.zeros((num_classes, num_classes), dtype=int)
+
+    for idx in range(y_true.shape[0]):
+        true_classes = np.where(y_true[idx] == 1)[0]
+        pred_classes = np.where(y_pred[idx] == 1)[0]
+
+        for true_idx in true_classes:
+            for pred_idx in pred_classes:
+                matrix[true_idx, pred_idx] += 1
+
+    return matrix.tolist()
+
+
 def recording_metrics(subject_ids, y_true, y_prob):
     grouped = {}
 
@@ -140,6 +155,7 @@ def recording_metrics(subject_ids, y_true, y_prob):
         "recording_micro_f1": float(f1_score(rec_true, rec_pred, average="micro", zero_division=0)),
         "recording_macro_auc": macro_auc(rec_true, rec_prob),
         "recording_confusion": multilabel_confusion_counts(rec_true, rec_pred),
+        "recording_pair_matrix": class_pair_matrix(rec_true, rec_pred),
     }
 
 
@@ -184,6 +200,7 @@ def evaluate(model, loader, device, criterion=None, threshold_tuning=False, reco
         "macro_auc": macro_auc(y_true, y_prob),
         "per_class_f1": per_class_f1.tolist(),
         "confusion": multilabel_confusion_counts(y_true, y_pred),
+        "pair_matrix": class_pair_matrix(y_true, y_pred),
         "thresholds": thresholds,
     }
 

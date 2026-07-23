@@ -30,6 +30,9 @@ def parse_args():
     parser.add_argument("--max-check", type=int, default=4000)
     parser.add_argument("--qrs", action="store_true")
     parser.add_argument("--gradcam-only", action="store_true")
+    parser.add_argument("--attention-only", action="store_true")
+    parser.add_argument("--attention-values", action="store_true")
+    parser.add_argument("--attention-summary", action="store_true")
     parser.add_argument("--notes-name", default="xai_clinical_notes.csv")
     return parser.parse_args()
 
@@ -114,6 +117,14 @@ def attention_map(model, x):
     return weights
 
 
+def attention_values(model, x):
+    with torch.no_grad():
+        _ = model(x)
+
+    weights = model.attention.last_weights
+    return weights.squeeze().detach().cpu().numpy()
+
+
 def find_examples(model, dataset, device, class_idx, max_check):
     correct = None
     wrong = None
@@ -196,27 +207,137 @@ def plot_xai(signal, heatmap, title, out_path, lead_idx, fs, show_qrs):
     plt.close(fig)
 
 
-def explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, tag, fs, show_qrs, gradcam_only=False):
+def plot_attention_values(weights, title, out_path):
+    steps = np.arange(1, len(weights) + 1)
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(steps, weights, color="#1f77b4", linewidth=1.5)
+    ax.fill_between(steps, weights, color="#1f77b4", alpha=0.25)
+    ax.set_title(title)
+    ax.set_xlabel("BiGRU time step")
+    ax.set_ylabel("Attention weight")
+    ax.grid(alpha=0.3)
+
+    top_indices = np.argsort(weights)[-5:]
+    ax.scatter(steps[top_indices], weights[top_indices], color="#d62728", s=35, zorder=5, label="Top weights")
+    ax.legend(fontsize=8)
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=200)
+    plt.close(fig)
+
+
+def save_attention_values(weights, out_path):
+    with open(out_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["time_step", "attention_weight"])
+
+        for idx, value in enumerate(weights, start=1):
+            writer.writerow([idx, float(value)])
+
+
+def plot_attention_summary(curves, title, out_path):
+    fig, ax = plt.subplots(figsize=(11, 5))
+
+    for label, weights in curves:
+        steps = np.arange(1, len(weights) + 1)
+        ax.plot(steps, weights, linewidth=1.4, label=label)
+
+    ax.set_title(title)
+    ax.set_xlabel("BiGRU time step")
+    ax.set_ylabel("Attention weight")
+    ax.grid(alpha=0.3)
+    ax.legend(ncol=3, fontsize=8)
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=220)
+    plt.close(fig)
+
+
+def save_attention_summary_csv(curves, out_path):
+    max_len = max(len(weights) for _, weights in curves)
+
+    with open(out_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["time_step"] + [label for label, _ in curves])
+
+        for idx in range(max_len):
+            row = [idx + 1]
+
+            for _, weights in curves:
+                if idx < len(weights):
+                    row.append(float(weights[idx]))
+                else:
+                    row.append("")
+
+            writer.writerow(row)
+
+
+def run_attention_summary(model, save_name, dataset, device, class_list, out_dir, max_check):
+    curves = []
+
+    for class_idx in class_list:
+        correct, _ = find_examples(model, dataset, device, class_idx, max_check)
+
+        if correct is None:
+            print(f"class{class_idx + 1}: no correct positive example found for attention summary.")
+            continue
+
+        idx, item, prob = correct
+        x = item["signal"].unsqueeze(0).to(device)
+        weights = attention_values(model, x)
+        label = f"Class {class_idx + 1} (p={prob[class_idx]:.2f})"
+        curves.append((label, weights))
+        print(f"class{class_idx + 1} attention summary example: sample {idx}")
+
+    if len(curves) == 0:
+        return []
+
+    plot_attention_summary(
+        curves,
+        f"{save_name} Attention Weights Across Classes",
+        os.path.join(out_dir, f"{save_name}_all_classes_attention_values.png"),
+    )
+    save_attention_summary_csv(
+        curves,
+        os.path.join(out_dir, f"{save_name}_all_classes_attention_values.csv"),
+    )
+
+    return [[save_name, "all", "correct", "-", "-", "-", f"{save_name}_all_classes_attention_values.png; {save_name}_all_classes_attention_values.csv", ""]]
+
+
+def explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, tag, fs, show_qrs, gradcam_only=False, attention_only=False, attention_values_only=False):
     signal = item["signal"].numpy()
     x = item["signal"].unsqueeze(0).to(next(model.parameters()).device)
     lead_name = LEAD_NAMES[lead_idx] if lead_idx < len(LEAD_NAMES) else f"lead{lead_idx + 1}"
     lead_tag = lead_name.replace(" ", "").replace("/", "")
-
-    # Grad-CAM on the last CNN layer
-    gradcam = GradCam1D(model, get_target_layer(model, model_name))
-    cam = gradcam(x, class_idx)
-    gradcam.remove()
-
     class_name = f"class{class_idx + 1}"
-    plot_xai(
-        signal,
-        cam,
-        f"{save_name} Grad-CAM ({tag}, {class_name}, {lead_name}, prob={prob[class_idx]:.3f})",
-        os.path.join(out_dir, f"{save_name}_{class_name}_{tag}_{lead_tag}_gradcam.png"),
-        lead_idx,
-        fs,
-        show_qrs,
-    )
+
+    if model_name == "cnn1d" and attention_values_only:
+        weights = attention_values(model, x)
+        base_name = f"{save_name}_{class_name}_{tag}_attention_values"
+        plot_attention_values(
+            weights,
+            f"{save_name} Attention Weights ({tag}, {class_name}, prob={prob[class_idx]:.3f})",
+            os.path.join(out_dir, f"{base_name}.png"),
+        )
+        save_attention_values(weights, os.path.join(out_dir, f"{base_name}.csv"))
+        return
+
+    if not attention_only:
+        gradcam = GradCam1D(model, get_target_layer(model, model_name))
+        cam = gradcam(x, class_idx)
+        gradcam.remove()
+
+        plot_xai(
+            signal,
+            cam,
+            f"{save_name} Grad-CAM ({tag}, {class_name}, {lead_name}, prob={prob[class_idx]:.3f})",
+            os.path.join(out_dir, f"{save_name}_{class_name}_{tag}_{lead_tag}_gradcam.png"),
+            lead_idx,
+            fs,
+            show_qrs,
+        )
 
     if model_name == "cnn1d" and not gradcam_only:
         attn = attention_map(model, x)
@@ -256,7 +377,7 @@ def write_xai_notes(out_dir, rows, notes_name):
             writer.writerow(row)
 
 
-def run_for_class(model, model_name, save_name, dataset, device, class_idx, lead_idx, out_dir, max_check, fs, show_qrs, gradcam_only=False):
+def run_for_class(model, model_name, save_name, dataset, device, class_idx, lead_idx, out_dir, max_check, fs, show_qrs, gradcam_only=False, attention_only=False, attention_values_only=False):
     rows = []
     correct, wrong = find_examples(model, dataset, device, class_idx, max_check)
     class_name = f"class{class_idx + 1}"
@@ -266,10 +387,15 @@ def run_for_class(model, model_name, save_name, dataset, device, class_idx, lead
     if correct is not None:
         idx, item, prob = correct
         print(f"{class_name} correct example: sample {idx}, {lead_name}")
-        explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, "correct", fs, show_qrs, gradcam_only)
+        explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, "correct", fs, show_qrs, gradcam_only, attention_only, attention_values_only)
 
-        files = [f"{save_name}_{class_name}_correct_{lead_tag}_gradcam.png"]
-        if model_name == "cnn1d" and not gradcam_only:
+        files = []
+        if attention_values_only:
+            files.append(f"{save_name}_{class_name}_correct_attention_values.png")
+            files.append(f"{save_name}_{class_name}_correct_attention_values.csv")
+        elif not attention_only:
+            files.append(f"{save_name}_{class_name}_correct_{lead_tag}_gradcam.png")
+        if model_name == "cnn1d" and not gradcam_only and not attention_values_only:
             files.append(f"{save_name}_{class_name}_correct_{lead_tag}_attention.png")
 
         rows.append([save_name, class_idx + 1, "correct", lead_name, idx, prob[class_idx], "; ".join(files), ""])
@@ -279,10 +405,15 @@ def run_for_class(model, model_name, save_name, dataset, device, class_idx, lead
     if wrong is not None:
         idx, item, prob = wrong
         print(f"{class_name} wrong example: sample {idx}, {lead_name}")
-        explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, "wrong", fs, show_qrs, gradcam_only)
+        explain_sample(model, model_name, save_name, item, prob, class_idx, lead_idx, out_dir, "wrong", fs, show_qrs, gradcam_only, attention_only, attention_values_only)
 
-        files = [f"{save_name}_{class_name}_wrong_{lead_tag}_gradcam.png"]
-        if model_name == "cnn1d" and not gradcam_only:
+        files = []
+        if attention_values_only:
+            files.append(f"{save_name}_{class_name}_wrong_attention_values.png")
+            files.append(f"{save_name}_{class_name}_wrong_attention_values.csv")
+        elif not attention_only:
+            files.append(f"{save_name}_{class_name}_wrong_{lead_tag}_gradcam.png")
+        if model_name == "cnn1d" and not gradcam_only and not attention_values_only:
             files.append(f"{save_name}_{class_name}_wrong_{lead_tag}_attention.png")
 
         rows.append([save_name, class_idx + 1, "wrong", lead_name, idx, prob[class_idx], "; ".join(files), ""])
@@ -330,24 +461,29 @@ def main():
     fs = config["preprocess"]["downsampled_rate"]
     note_rows = []
 
-    for class_idx in class_list:
-        for lead_idx in lead_list:
-            note_rows.extend(
-                run_for_class(
-                    model,
-                    args.model,
-                    save_name,
-                    dataset,
-                    device,
-                    class_idx,
-                    lead_idx,
-                    out_dir,
-                    args.max_check,
-                    fs,
-                    args.qrs,
-                    args.gradcam_only,
+    if args.attention_summary:
+        note_rows.extend(run_attention_summary(model, save_name, dataset, device, class_list, out_dir, args.max_check))
+    else:
+        for class_idx in class_list:
+            for lead_idx in lead_list:
+                note_rows.extend(
+                    run_for_class(
+                        model,
+                        args.model,
+                        save_name,
+                        dataset,
+                        device,
+                        class_idx,
+                        lead_idx,
+                        out_dir,
+                        args.max_check,
+                        fs,
+                        args.qrs,
+                        args.gradcam_only,
+                        args.attention_only,
+                        args.attention_values,
+                    )
                 )
-            )
 
     write_xai_notes(out_dir, note_rows, args.notes_name)
 
