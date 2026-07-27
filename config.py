@@ -1,7 +1,14 @@
 # config.py
 
+STFT_PARAMS = {"n_fft": 64, "hop_length": 16, "win_length": 64}
+
+
 def get_config():
     config = {
+        "wandb": {
+            "EXPERIMENT_NAME": "cnn_vit" ,
+            "PROJECT_NAME": "ecg-classification"
+        },
         "paths": {
             "raw_data": "./data/raw/",
             "processed_data": "./data/processed/",
@@ -25,7 +32,7 @@ def get_config():
         },
 
         "model": {
-            "name": "cnn1d"
+            "name": "cnn_vit"
         },
 
         "preprocess": {

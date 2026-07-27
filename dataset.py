@@ -8,8 +8,9 @@ from torch.utils.data import Dataset
 
 
 class BiosignalDataset(Dataset):
-    def __init__(self, config, subject_ids=None, augment=False):
+    def __init__(self, config, subject_ids=None, transform=None, augment=False):
         self.data = []
+        self.transform = transform
         self.augment = augment
         self.aug_config = config["training"].get("augmentation", {})
 
@@ -91,6 +92,8 @@ class BiosignalDataset(Dataset):
             signal = self.apply_augmentation(signal)
 
         x = torch.tensor(signal, dtype=torch.float32)
+        if self.transform is not None:
+            x = self.transform(x)
         y = torch.tensor(item["label"], dtype=torch.float32)
 
         return {
